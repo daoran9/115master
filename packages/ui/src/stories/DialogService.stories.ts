@@ -640,6 +640,8 @@ StackAndCloseAll.test('proves Stack focus restoration and closeAll LIFO', async 
   await waitFor(() => expect(parentConfirm).toHaveFocus())
   await expect(parent).toHaveAttribute('open')
   await userEvent.click(canvas.getByRole('button', { name: 'Cancel' }))
+  await waitFor(() => expect(canvas.queryAllByRole('dialog')).toHaveLength(0))
+  await waitFor(() => expect(canvas.getByRole('button', { name: 'Open nested flow' })).toHaveFocus())
 
   const trigger = canvas.getByRole('button', { name: 'Open three Dialogs' })
   await userEvent.click(trigger)
