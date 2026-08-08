@@ -1,17 +1,32 @@
 <template>
-  <div :class="styles.container.main">
+  <div
+    data-video-page
+    :data-theatre="preferences.theatre"
+    :class="[
+      styles.container.main,
+      preferences.theatre && styles.container.mainTheatre,
+    ]"
+  >
     <!-- 主内容区域 -->
-    <div :class="styles.container.pageMain">
+    <div
+      :class="[
+        styles.container.pageMain,
+        preferences.theatre && styles.container.pageMainTheatre,
+      ]"
+    >
       <div
+        data-video-player-shell
         :class="[
           styles.player.container,
           preferences.showPlaylist && styles.player.containerFold,
+          preferences.theatre && styles.player.containerTheatre,
         ]"
       >
         <!-- 视频播放器 -->
         <XPlayer
           ref="xplayerRef"
           v-model:show-playlist="preferences.showPlaylist"
+          v-model:theatre="preferences.theatre"
           v-model:volume="preferences.volume"
           v-model:muted="preferences.muted"
           v-model:playback-rate="preferences.playbackRate"
@@ -100,7 +115,7 @@
     </div>
 
     <!-- 页面下方内容 -->
-    <div v-if="PLUS_VERSION" :class="styles.container.pageFlow">
+    <div v-if="showMovieInfo" :class="styles.container.pageFlow">
       <!-- 电影信息 -->
       <MovieInfo :movie-infos="DataMovieInfo" />
     </div>
@@ -151,7 +166,6 @@ import { ACTION_GROUPS } from '@/components/XPlayer/components/Shortcuts/shortcu
 import XPlayer from '@/components/XPlayer/index.vue'
 import { controlStyles } from '@/components/XPlayer/styles/common'
 import { formatTime } from '@/components/XPlayer/utils/time'
-import { PLUS_VERSION } from '@/constants'
 import { useMoveAction } from '@/hooks/useDriveAction/useMoveAction'
 import { useLockFn } from '@/hooks/useLockFn'
 import { I, Icon } from '@/icons'
@@ -163,6 +177,7 @@ import { getAvNumber } from '@/utils/getNumber'
 import { appLogger } from '@/utils/logger'
 import { isMac } from '@/utils/platform'
 import { goToPlayer } from '@/utils/route'
+import { useUserSetting } from '@/utils/userSettings'
 import { webLinkIINA, webLinkShortcutsMpv } from '@/utils/weblink'
 import About from './components/About/index.vue'
 import { FileActionMenu } from './components/FileActionMenu'
@@ -193,16 +208,25 @@ const styles = clsx({
       '[--app-playlist-width:calc(100%*var(--app-playlist-ratio))]',
       'relative',
     ],
-    pageMain: ['relative h-screen w-full overflow-hidden bg-black'],
+    mainTheatre: 'ui-z-host fixed inset-0 h-screen w-screen overflow-hidden bg-black',
+    pageMain: [
+      'relative flex min-h-screen w-full items-center justify-center overflow-hidden',
+      'bg-base-100 px-4 py-6 sm:px-8',
+    ],
+    pageMainTheatre: 'h-screen min-h-0 bg-black p-0!',
     pageFlow: 'bg-base-100 flex w-full flex-col gap-8 px-6 py-8 xl:px-36',
   },
   // 播放器样式
   player: {
-    container:
-      ['relative flex h-screen w-full transform-gpu items-center justify-center transition-all duration-200 ease-[var(--app-ease-in-out-cubic)] will-change-contents'],
+    container: [
+      'relative flex aspect-video w-full max-w-[calc((100vh-3rem)*16/9)]',
+      'transform-gpu items-center justify-center overflow-hidden rounded-lg',
+      'transition-all duration-200 ease-[var(--app-ease-in-out-cubic)] will-change-contents',
+    ],
     containerFold: [
       'w-(--app-xplayer-width)!',
     ],
+    containerTheatre: '[aspect-ratio:auto] h-screen max-w-none rounded-none',
     video: 'absolute m-auto h-full w-full overflow-hidden',
   },
   // 侧边栏样式
@@ -238,6 +262,8 @@ const logger = appLogger.sub('Video')
 const xplayerRef = ref<InstanceType<typeof XPlayerInstance>>()
 /** 偏好设置 */
 const preferences = usePreferences()
+/** 播放页影片详情开关 */
+const showMovieInfo = useUserSetting('enablePlayerMovieInfo')
 /** 参数 */
 const params = useParamsVideoPage()
 /** 视频源 */
@@ -260,6 +286,28 @@ const DataMark = useMark(DataFileInfo)
 const moveAction = useMoveAction()
 /** drive 列表 store（移动后最小化刷新缓存用） */
 const driveStore = useDriveStore()
+
+/** 同步影片详情数据。 */
+function syncMovieInfo(avNumber = getAvNumber(DataFileInfo.state.file_name)) {
+  /*
+   * ================================================================================
+   * 步骤1：同步播放页影片详情
+   * ================================================================================
+   * 目标：用运行时设置替代 Plus 编译门控，并避免关闭时请求外部资料源。
+   * 操作：
+   * 1) 清理上一文件的影片资料
+   * 2) 开关开启且识别到番号时加载 JavDB 与 JavBus
+   */
+  logger.info('开始同步播放页影片详情', avNumber)
+
+  DataMovieInfo.clear()
+  if (showMovieInfo.value && avNumber) {
+    DataMovieInfo.javDBState.execute(0, avNumber)
+    DataMovieInfo.javBusState.execute(0, avNumber)
+  }
+
+  logger.info('播放页影片详情同步完成', avNumber)
+}
 /** 是否正在切换视频 */
 const changeing = shallowRef(false)
 /** 视频尺寸 */
@@ -566,10 +614,7 @@ async function loadData(isFirst = true) {
       // 设置标题
       useTitle(DataFileInfo.state.file_name || '')
       // 加载番号信息
-      if (avNumber) {
-        DataMovieInfo.javDBState.execute(0, avNumber)
-        DataMovieInfo.javBusState.execute(0, avNumber)
-      }
+      syncMovieInfo(avNumber)
       // 加载字幕
       DataSubtitles.execute(0, pickCode, res.file_name, avNumber)
 
@@ -698,6 +743,8 @@ onMounted(async () => {
   await loadData()
 })
 
+watch(showMovieInfo, () => syncMovieInfo())
+
 // 监听路由参数变化，处理浏览器前进/后退
 watch(
   () => params.pickCode.value,
@@ -713,9 +760,7 @@ watch(
       DataVideoSources.clear()
       DataHistory.clear()
       DataSubtitles.clear()
-      if (PLUS_VERSION) {
-        DataMovieInfo.clear()
-      }
+      DataMovieInfo.clear()
 
       // 重新加载数据
       await nextTick()

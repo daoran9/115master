@@ -1,6 +1,17 @@
 <template>
-  <div ref="extInfoRef" :class="styles.container.main">
-    <div :class="styles.container.content">
+  <div
+    ref="extInfoRef"
+    :class="[
+      styles.container.main,
+      props.variant === 'drive' ? styles.container.driveMain : styles.container.legacyMain,
+    ]"
+  >
+    <div
+      :class="[
+        styles.container.content,
+        props.variant === 'drive' && styles.container.driveContent,
+      ]"
+    >
       <!-- 错误状态 -->
       <div v-if="extInfo.error.value" :class="styles.states.error">
         <LoadingError :message="extInfo.error.value" size="mini" />
@@ -18,7 +29,7 @@
 
       <!-- 内容 -->
       <template v-else-if="extInfo.state.value">
-        <div :class="styles.cover.container">
+        <div :class="[styles.cover.container, props.variant === 'drive' && styles.cover.drive]">
           <a href="javascript:void(0)" :alt="extInfo.state.value?.title" :class="styles.cover.link">
             <Image
               :src="extInfo.state.value?.cover?.url ?? ''"
@@ -29,7 +40,7 @@
           </a>
         </div>
 
-        <div :class="styles.main.container">
+        <div :class="[styles.main.container, props.variant === 'drive' && styles.main.drive]">
           <div :class="styles.title.container">
             <a
               :href="extInfo.state.value?.detailUrl"
@@ -42,7 +53,7 @@
             </a>
           </div>
 
-          <div :class="styles.content.container">
+          <div :class="[styles.content.container, props.variant === 'drive' && styles.content.drive]">
             <div :class="styles.content.group">
               <div :class="styles.item.container">
                 <span :class="styles.item.label">番号</span>
@@ -131,7 +142,7 @@
           </div>
         </div>
 
-        <div :class="styles.meta.avNumber">
+        <div :class="[styles.meta.avNumber, props.variant === 'drive' && styles.meta.drive]">
           {{ props.avNumber }}
         </div>
       </template>
@@ -142,7 +153,7 @@
 <script setup lang="ts">
 import { format } from '@115master/utils'
 import { useAsyncState, useElementVisibility } from '@vueuse/core'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import {
   Empty,
   Image,
@@ -152,20 +163,28 @@ import { clsx } from '@/utils/clsx'
 import { createGMImageLoader } from '@/utils/imageLoader'
 import { Jav, JavBus, JavDB } from '@/utils/jav'
 import { MissAV } from '@/utils/jav/missAV'
+import { appLogger } from '@/utils/logger'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   avNumber: string
-}>()
+  variant?: 'drive' | 'legacy'
+}>(), {
+  variant: 'legacy',
+})
 const javBus = new JavBus()
 const javDB = new JavDB()
 const missAV = new MissAV()
+const logger = appLogger.sub('ExtInfo')
 
 /** 样式常量定义 */
 const styles = clsx({
   // 容器样式
   container: {
-    main: 'h-24 w-full px-20',
+    main: 'w-full',
+    legacyMain: 'h-24 px-20',
+    driveMain: 'min-h-20 px-3 pt-2 pb-3',
     content: 'group relative flex h-full items-center gap-1',
+    driveContent: 'flex-col items-stretch gap-2',
   },
   // 状态样式
   states: {
@@ -175,11 +194,13 @@ const styles = clsx({
   // 封面样式
   cover: {
     container: 'flex h-24 w-36 items-center justify-center',
+    drive: 'hidden',
     link: 'block h-full w-full',
   },
   // 主要内容样式
   main: {
     container: 'flex flex-1 flex-col gap-2',
+    drive: 'w-full min-w-0',
   },
   // 标题样式
   title: {
@@ -189,6 +210,7 @@ const styles = clsx({
   // 内容样式
   content: {
     container: 'ml-2 flex flex-1 items-start gap-5',
+    drive: 'ml-0 grid grid-cols-1 gap-1 sm:grid-cols-2',
     group: 'flex min-w-32 flex-col gap-0.5',
   },
   // 项目样式
@@ -204,6 +226,7 @@ const styles = clsx({
   // 元信息样式
   meta: {
     avNumber: 'text-base-content/40 absolute right-4 bottom-2 text-xs',
+    drive: 'hidden',
   },
 })
 
@@ -214,26 +237,42 @@ const extInfoRefVisible = useElementVisibility(extInfoRef, {
 
 const extInfo = useAsyncState(
   async () => {
-    const javs = [javBus, javDB, missAV]
-    for (const jav of javs) {
-      const info = await jav.getInfoByCache(props.avNumber)
-      if (info) {
-        return info
-      }
-    }
+    /**
+     * ================================================================================
+     * 步骤1：按缓存优先级加载番号资料
+     * ================================================================================
+     * 目标：复用旧版多来源能力，并避免可见列表重复请求。
+     * 操作：
+     * 1) 先读取 JavBus、JavDB、MissAV 缓存
+     * 2) 缓存未命中时按来源顺序请求
+     */
+    logger.info('开始加载番号资料', props.avNumber)
 
-    for (const [index, jav] of Object.entries(javs)) {
-      try {
-        return await jav.getInfo(props.avNumber)
-      }
-      catch (error) {
-        if (Number(index) === javs.length - 1) {
-          if (error instanceof Jav.NotFound) {
-            return null
-          }
-          throw error
+    try {
+      const javs = [javBus, javDB, missAV]
+      for (const jav of javs) {
+        const info = await jav.getInfoByCache(props.avNumber)
+        if (info) {
+          return info
         }
       }
+
+      for (const [index, jav] of Object.entries(javs)) {
+        try {
+          return await jav.getInfo(props.avNumber)
+        }
+        catch (error) {
+          if (Number(index) === javs.length - 1) {
+            if (error instanceof Jav.NotFound) {
+              return null
+            }
+            throw error
+          }
+        }
+      }
+    }
+    finally {
+      logger.info('番号资料加载完成', props.avNumber)
     }
   },
   null,
@@ -254,6 +293,4 @@ watch(extInfoRefVisible, (visible) => {
     extInfo.execute(0)
   }
 })
-
-onMounted(async () => {})
 </script>

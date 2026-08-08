@@ -6,8 +6,7 @@ import { homeHtml } from '../../support/pages/homeHtml'
 
 /**
  * FileListMod：文件列表增强（FileItemMod 插件数组）
- * 普通构建下加载的 itemMod：folderLink / videoCover / extMenu / clickPlay / download
- * （extInfo / actressInfo 为 IS_PLUS，普通构建跳过）
+ * 融合版按运行时设置加载 videoCover / extInfo / actressInfo 等增强。
  */
 test.describe('FileListMod', () => {
   test('初始加载：按项类型注入对应增强', async ({ page }) => {
@@ -61,7 +60,8 @@ test.describe('FileListMod', () => {
 
     const video = page.locator('li[pick_code="dynamicVideoPick"]')
     await expect(video.locator('a.master-player')).toBeAttached()
-    await expect(video).toHaveClass(/with-ext-video-cover/)
+    await expect(video).toHaveClass(/with-ext-info/)
+    await expect(video.locator('.ext-info-root')).toBeAttached()
     await expect(page.locator('li[title="动态文件夹"] .file-name a'))
       .toHaveAttribute('href', 'https://115.com/?cid=2001&offset=0&tab=&mode=wangpan')
     // 旧列表项已被移除
@@ -106,21 +106,20 @@ test.describe('FileListMod', () => {
     expect(errors).toEqual([])
   })
 
-  test('Plus 门控：普通构建不出现 Plus 增强', async ({ page }) => {
+  test('融合版默认恢复番号资料增强', async ({ page }) => {
     const errors = watch(page)
     await setupHarness(page)
     await page.goto(HOME_URL)
 
-    // 注入带番号的视频项：Plus 构建下会出现 extInfo，普通构建必须没有
+    // 注入带番号的视频项：默认加载番号资料，并由设置页运行时控制。
     await replaceList(page, [
       { title: 'ABP-123 番号视频.mp4', iv: '1', file_type: '1', pick_code: 'avNumberPick', sha1: 'AVSHA1' },
     ])
     const video = page.locator('li[pick_code="avNumberPick"]')
     await expect(video.locator('a.master-player')).toBeAttached()
-    await expect(page.locator('li.with-ext-info')).toHaveCount(0)
-    await expect(page.locator('.ext-info-root')).toHaveCount(0)
-    await expect(page.locator('li.with-actress-info')).toHaveCount(0)
-    await expect(page.locator('.actress-info-img')).toHaveCount(0)
+    await expect(video).toHaveClass(/with-ext-info/)
+    await expect(video.locator('.ext-info-root')).toBeAttached()
+    await expect(video).not.toHaveClass(/with-ext-video-cover/)
     expect(errors).toEqual([])
   })
 })
@@ -154,7 +153,7 @@ test.describe('FileItemMod 交互', () => {
 
     const video = page.locator('li[iv="1"]').first()
     const pickCode = await video.getAttribute('pick_code')
-    await video.click({ button: 'middle' })
+    await video.dispatchEvent('auxclick', { button: 1 })
 
     await expect.poll(() => tabs.length).toBeGreaterThan(0)
     expect(tabs[0]).toBe(`https://115vod.com/?pickcode=${pickCode}&share_id=0`)

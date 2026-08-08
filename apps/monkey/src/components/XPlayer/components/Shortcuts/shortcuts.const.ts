@@ -136,6 +136,7 @@ export const DEFAULT_ACTION_KEY_BINDINGS = {
   prevSubtitle: [],
 
   // window
+  toggleTheatre: ['v'],
   toggleFullscreen: ['f'],
   togglePictureInPicture: ['p'],
 

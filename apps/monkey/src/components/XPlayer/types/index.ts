@@ -109,6 +109,8 @@ export interface XPlayerProps {
   sources: Ref<VideoSource[]>
   /** 显示播放列表 */
   showPlaylist: boolean
+  /** 剧院模式 */
+  theatre: boolean
   /** 音量 */
   volume: number
   /** 静音 */
@@ -178,6 +180,8 @@ export interface XPlayerProps {
 export interface XPlayerEmit {
   /** 播放列表 */
   'update:showPlaylist': [boolean]
+  /** 剧院模式 */
+  'update:theatre': [boolean]
   /** 音量 */
   'update:volume': [number]
   /** 静音 */

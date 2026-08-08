@@ -1,27 +1,29 @@
 import type { App } from 'vue'
 import { createApp } from 'vue'
-import { PLUS_VERSION } from '@/constants'
 import ExtVideoCover from '@/pages/home/components/ExtVideoCover/index.vue'
 import { FileListType, IvType } from '@/pages/home/types'
 import mainStyles from '@/styles/main.css?inline'
+import { appLogger } from '@/utils/logger'
+import { userSettings } from '@/utils/userSettings'
 import { FileItemModBase } from './base'
+
+/** 视频封面增强共用日志。 */
+const logger = appLogger.sub('FileItemModVideoCover')
 
 /**
  * FileItemMod 视频封面
  */
 export class FileItemModVideoCover extends FileItemModBase {
-  readonly ENABLE_KEY_IN_USER_SETTING = 'enableFilelistPreview'
+  readonly SETTING_KEYS = ['enableFilelistPreview', 'enableAvInfo'] as const
 
+  private container: HTMLDivElement | null = null
   private vueApp: App | null = null
 
   onLoad() {
+    logger.info('开始加载旧版页面视频封面')
+
     // 如果文件列表类型为网格，则不加载
     if (this.itemInfo.fileListType === FileListType.grid) {
-      return
-    }
-
-    // 如果有番号并且是Plus版本，则不加载
-    if (this.itemInfo.avNumber && PLUS_VERSION) {
       return
     }
 
@@ -36,6 +38,7 @@ export class FileItemModVideoCover extends FileItemModBase {
     const container = document.createElement('div')
     container.style.width = '100%'
     this.itemNode.append(container)
+    this.container = container
 
     /** 创建 shadow DOM */
     const shadowRoot = container.attachShadow({ mode: 'open' })
@@ -61,9 +64,21 @@ export class FileItemModVideoCover extends FileItemModBase {
     })
     app.mount(root)
     this.vueApp = app
+    logger.info('旧版页面视频封面加载完成')
   }
 
   onDestroy() {
+    logger.info('开始卸载旧版页面视频封面')
     this.vueApp?.unmount()
+    this.vueApp = null
+    this.container?.remove()
+    this.container = null
+    this.itemNode.classList.remove('with-ext-video-cover')
+    logger.info('旧版页面视频封面卸载完成')
+  }
+
+  protected isEnabled(): boolean {
+    return userSettings.value.enableFilelistPreview
+      && (!this.itemInfo.avNumber || !userSettings.value.enableAvInfo)
   }
 }

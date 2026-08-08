@@ -5,8 +5,9 @@ import { computed, defineComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import PKG from '@/../package.json'
 import ThemeToggle from '@/components/ThemeToggle'
 import { I, Icon } from '@/icons'
+import { useUserSetting } from '@/utils/userSettings'
 
-export type PreferenceSection = 'appearance' | 'about'
+export type PreferenceSection = 'appearance' | 'enhancements' | 'about'
 
 interface SectionItem {
   id: PreferenceSection
@@ -16,10 +17,41 @@ interface SectionItem {
 
 export const PREFERENCE_SECTIONS: SectionItem[] = [
   { id: 'appearance', label: '外观', icon: I.THEME_LIGHT },
+  { id: 'enhancements', label: '增强', icon: I.EXTENSION },
   { id: 'about', label: '关于', icon: I.ABOUT },
 ]
 
 const DESKTOP_MQ = '(min-width: 640px)'
+
+const SettingToggle = defineComponent({
+  name: 'SettingToggle',
+  props: {
+    label: {
+      type: String,
+      required: true,
+    },
+    modelValue: {
+      type: Boolean,
+      required: true,
+    },
+  },
+  emits: {
+    'update:modelValue': (_value: boolean) => true,
+  },
+  setup(props, { emit }) {
+    return () => (
+      <label class="hover:bg-base-content/5 flex cursor-pointer items-center justify-between rounded-lg px-3 py-2">
+        <span class="text-base-content text-sm">{props.label}</span>
+        <input
+          type="checkbox"
+          class="toggle toggle-primary toggle-sm"
+          checked={props.modelValue}
+          onChange={event => emit('update:modelValue', (event.target as HTMLInputElement).checked)}
+        />
+      </label>
+    )
+  },
+})
 
 const PreferencesContent = defineComponent({
   name: 'PreferencesContent',
@@ -36,6 +68,10 @@ const PreferencesContent = defineComponent({
   },
 
   setup(props, { emit }) {
+    const preview = useUserSetting('enableFilelistPreview')
+    const avInfo = useUserSetting('enableAvInfo')
+    const actressFaces = useUserSetting('enableActressFaces')
+    const playerMovieInfo = useUserSetting('enablePlayerMovieInfo')
     const isDesktop = ref(false)
     let mql: MediaQueryList | undefined
 
@@ -114,6 +150,31 @@ const PreferencesContent = defineComponent({
               </div>
             )}
 
+            {display.value === 'enhancements' && (
+              <div class="flex flex-col gap-1">
+                <SettingToggle
+                  label="文件视频封面"
+                  modelValue={preview.value}
+                  onUpdate:modelValue={value => preview.value = value}
+                />
+                <SettingToggle
+                  label="番号资料"
+                  modelValue={avInfo.value}
+                  onUpdate:modelValue={value => avInfo.value = value}
+                />
+                <SettingToggle
+                  label="演员头像"
+                  modelValue={actressFaces.value}
+                  onUpdate:modelValue={value => actressFaces.value = value}
+                />
+                <SettingToggle
+                  label="播放页影片详情"
+                  modelValue={playerMovieInfo.value}
+                  onUpdate:modelValue={value => playerMovieInfo.value = value}
+                />
+              </div>
+            )}
+
             {display.value === 'about' && (
               <div class="flex flex-col gap-4 text-sm">
                 <div>
@@ -140,11 +201,11 @@ const PreferencesContent = defineComponent({
                     class="border-base-content/10 hover:bg-base-content/5 flex items-center justify-between rounded-lg border px-3 py-2"
                     href={PKG.funding}
                     target="_blank"
-                    title="赞助"
+                    title="赞助原作者"
                   >
                     <span class="flex items-center gap-2">
                       <Icon name={I.SPONSOR} class="text-base" />
-                      <span>赞助</span>
+                      <span>赞助原作者</span>
                     </span>
                     <Icon name={I.RIGHT} class="text-base-content/40 text-base" />
                   </a>

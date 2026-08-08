@@ -17,6 +17,7 @@ import { userscript } from './userscript'
 
 export const HOME_URL = 'https://115.com/?cid=0&offset=0&mode=wangpan'
 export const MASTER_URL = 'https://115.com/web/lixian/master/'
+export const OFFICIAL_URL = 'https://115.com/web/new-drive/'
 
 export interface HarnessOptions {
   /** 初始 GM 值（GM_getValue 数据源，localStorage 持久化） */

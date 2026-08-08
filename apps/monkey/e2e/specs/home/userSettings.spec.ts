@@ -32,16 +32,14 @@ test.describe('userSettings 开关', () => {
     await expect(coverRoots).toHaveCount(40)
     await expect(preview).toHaveClass(/active/)
 
-    // 关闭预览：设置持久化、开关去 active、封面 Vue 应用卸载（挂载点清空）
+    // 关闭预览：设置持久化、开关去 active、封面挂载点完整移除。
     await preview.click()
     await expect(preview).not.toHaveClass(/active/)
     await expect.poll(async () => {
       const store = await gmStore(page)
       return (store.USER_SETTINGS as { enableFilelistPreview?: boolean } | undefined)?.enableFilelistPreview
     }).toBe(false)
-    await expect.poll(async () =>
-      coverRoots.first().evaluate(el => el.childElementCount),
-    ).toBe(0)
+    await expect(coverRoots).toHaveCount(0)
 
     // 重新开启：设置持久化、开关 active、封面重新挂载出内容
     await preview.click()
@@ -50,9 +48,7 @@ test.describe('userSettings 开关', () => {
       const store = await gmStore(page)
       return (store.USER_SETTINGS as { enableFilelistPreview?: boolean } | undefined)?.enableFilelistPreview
     }).toBe(true)
-    await expect.poll(async () =>
-      page.locator('.ext-video-cover-root').last().evaluate(el => el.childElementCount),
-    ).toBeGreaterThan(0)
+    await expect(page.locator('li.with-ext-video-cover .ext-video-cover-root')).toHaveCount(40)
     expect(errors).toEqual([])
   })
 })

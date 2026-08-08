@@ -68,18 +68,16 @@ export default defineConfig({
     monkey({
       entry: 'src/main.ts',
       userscript: {
-        'name': dev?.userscript.name ?? '115Master',
+        'name': dev?.userscript.name ?? '115Master Fusion',
         'icon': logoSvg,
-        'namespace': '115Master',
+        'namespace': 'https://github.com/daoran9/115master',
         'homepage': PKG.homepage,
         'author': PKG.author,
         'description': PKG.description,
         'supportURL': PKG.bugs?.url,
         'run-at': 'document-start',
         'include': [
-          'https://115.com/?ct*',
-          'https://115.com/web/lixian/master*',
-          'https://115.com/?aid*',
+          'https://115.com/*',
           'https://dl.115cdn.net/video/token',
         ],
         'exclude': [
@@ -113,13 +111,13 @@ export default defineConfig({
           icon: logoSvg,
         },
         'downloadURL':
-          'https://github.com/cbingb666/115master/releases/latest/download/115master.user.js',
+          'https://github.com/daoran9/115master/releases/latest/download/115master-fusion.user.js',
         'updateURL':
-          'https://github.com/cbingb666/115master/releases/latest/download/115master.meta.js',
+          'https://github.com/daoran9/115master/releases/latest/download/115master-fusion.meta.js',
       },
       build: {
-        fileName: '115master.user.js',
-        metaFileName: '115master.meta.js',
+        fileName: '115master-fusion.user.js',
+        metaFileName: '115master-fusion.meta.js',
         externalGlobals: {
           'vue': _cdn('Vue', 'dist/vue.global.prod.js'),
           'localforage': _cdn('localforage', 'dist/localforage.min.js'),

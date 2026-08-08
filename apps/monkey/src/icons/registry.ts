@@ -41,6 +41,8 @@ export const I = {
   FAST_REWIND: 'ion:caret-back',
   FULLSCREEN: 'ion:expand',
   FULLSCREEN_EXIT: 'ion:contract',
+  THEATRE: 'ion:tablet-landscape',
+  THEATRE_EXIT: 'ion:browsers-outline',
   VOLUME_OFF: 'ion:volume-off',
   VOLUME_MUTE: 'ion:volume-mute',
   VOLUME_DOWN: 'ion:volume-low',

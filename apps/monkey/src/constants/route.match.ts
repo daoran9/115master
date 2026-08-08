@@ -2,10 +2,10 @@ import { Share } from '@115master/drive115'
 import { MASTER_BASE_URL } from '.'
 
 const ROUTE_MATCH = {
-  HOME: `*://${Share.CONSTANT.HOST_115.NORMAL}/?*`,
   MASTER: `${MASTER_BASE_URL}*`,
   MAGNET: `${MASTER_BASE_URL}/magnet/*`,
-  VIDEO: `${MASTER_BASE_URL}/video/*`,
+  HOME: `*://${Share.CONSTANT.HOST_115.NORMAL}/?*`,
+  OFFICIAL: `*://${Share.CONSTANT.HOST_115.NORMAL}/*`,
   VIDEO_TOKEN: `*://${Share.CONSTANT.HOST_115.DL}/video/token`,
 }
 

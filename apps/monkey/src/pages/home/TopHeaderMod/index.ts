@@ -2,6 +2,7 @@ import type { TopRootSearchParams } from '@/pages/home/global'
 import { unsafeWindow } from '$'
 import { I } from '@/icons'
 import { BaseMod } from '@/pages/home/BaseMod'
+import { appLogger } from '@/utils/logger'
 import { getUrlParams } from '@/utils/url'
 import { userSettings } from '@/utils/userSettings'
 import { openOfflineTask } from './openOfflineTask'
@@ -17,6 +18,10 @@ import 'iconify-icon'
  * 4. 添加预览切换开关
  */
 export class TopHeaderMod extends BaseMod {
+  private readonly logger = appLogger.sub('TopHeaderMod')
+  private menuObserver: ResizeObserver | null = null
+  private menuFrame: number | null = null
+
   constructor() {
     super()
     this.init()
@@ -29,7 +34,28 @@ export class TopHeaderMod extends BaseMod {
   }
 
   /** 销毁 */
-  destroy() {}
+  destroy() {
+    /*
+     * ================================================================================
+     * 步骤1：释放顶栏增强
+     * ================================================================================
+     * 目标：页面重绘或路由切换后不残留观察器与重复按钮。
+     * 操作：
+     * 1) 停止尺寸监听并取消待处理的布局任务
+     * 2) 移除 Fusion 注入的顶栏按钮
+     */
+    this.logger.info('开始释放旧版页面顶栏增强')
+
+    this.menuObserver?.disconnect()
+    this.menuObserver = null
+    if (this.menuFrame !== null)
+      cancelAnimationFrame(this.menuFrame)
+    this.menuFrame = null
+    this.topHeaderNode?.querySelector('.master-offline-task-btn')?.remove()
+    this.topHeaderNode?.querySelector('.master-preview-switch-btn')?.remove()
+
+    this.logger.info('旧版页面顶栏增强释放完成')
+  }
 
   /** 初始化 */
   private init() {
@@ -44,8 +70,7 @@ export class TopHeaderMod extends BaseMod {
     this.deleteOfficialDownloadButton()
     this.addMasterOfflineTaskButton()
     this.addPreviewSwitchButton()
-    this.fixContextMenuPosition('upload_btn_add_dir')
-    this.fixContextMenuPosition('create_new_add_dir')
+    this.watchContextMenuPosition()
   }
 
   /** 删除官方的离线任务按钮 */
@@ -122,5 +147,35 @@ export class TopHeaderMod extends BaseMod {
       return
     const tabRect = tabNode.getBoundingClientRect()
     contextMenuNode.style.left = `${tabRect.left}px`
+  }
+
+  /** 跟随顶栏布局变化修正下拉菜单位置。 */
+  private watchContextMenuPosition() {
+    /*
+     * ================================================================================
+     * 步骤1：监听顶栏布局
+     * ================================================================================
+     * 目标：图标、字体或新版官方 DOM 延迟布局后，下拉菜单仍对齐触发按钮。
+     * 操作：
+     * 1) 用 ResizeObserver 捕获顶栏尺寸变化
+     * 2) 在下一帧统一重算上传与新建菜单坐标
+     */
+    this.logger.info('开始监听旧版页面顶栏布局')
+
+    const update = () => {
+      if (this.menuFrame !== null)
+        cancelAnimationFrame(this.menuFrame)
+      this.menuFrame = requestAnimationFrame(() => {
+        this.fixContextMenuPosition('upload_btn_add_dir')
+        this.fixContextMenuPosition('create_new_add_dir')
+        this.menuFrame = null
+      })
+    }
+
+    this.menuObserver = new ResizeObserver(update)
+    this.menuObserver.observe(this.topHeaderNode)
+    update()
+
+    this.logger.info('旧版页面顶栏布局监听完成')
   }
 }

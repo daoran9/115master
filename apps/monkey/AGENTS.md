@@ -10,6 +10,7 @@
 main.ts (run-at: document-start)
 ├── HOME        115.com/?ct*              → HomePage        # Mod 系统：向官方页面注入增强
 ├── MASTER      /web/lixian/master*       → createMasterApp # 独立 SPA：重置文档，挂载 Vue 应用
+├── OFFICIAL    115.com/*                  → OfficialPage    # 新版/未知 DOM：隔离的 MASTER 入口
 ├── VIDEO_TOKEN dl.115cdn.net/video/token → videoTokenPage  # 隐藏 iframe cookie 桥
 └── MAGNET      /master/magnet/*          → magnetPage      # 磁力协议处理
 ```
@@ -66,8 +67,7 @@ src/
 - 顶层 Mod：`NavMod` / `FileListMod` / `TopFilePathMod` / `TopHeaderMod`，由 `HomePage` 装配。
 - `FileListMod` 监听 `DataListBox` 子节点变化，对每个新增 `<li>` 创建 `FileItemModLoader`，跑一组 `FileItemMod` 插件；节点移除时销毁对应 loader。
 - `FileItemModBase`（`FileListMod/FileItemMod/base.ts`）— 单 item 增强基类：
-  - `ENABLE_KEY_IN_USER_SETTING` — 绑定到 `userSettings` 某字段，开关变化时自动 `onLoad`/`onDestroy`。
-  - `IS_PLUS` — Plus 版才启用的增强。
+  - `SETTING_KEYS` — 绑定一个或多个 `userSettings` 字段，开关变化时自动 `onLoad`/`onDestroy`。
   - 生命周期：`load()` → `onLoad()`，`destroy()` → `onDestroy()`。
 
 新增文件列表增强 = 写一个 `FileItemMod/*` 类实现 `FileItemModBase`，加进 `FileListMod` 的 `itemMods` 数组。
@@ -131,18 +131,19 @@ new Drive115({
 - `run-at: document-start` —— `main.ts` 须先设 `document.domain` 再等 `DOMContentLoaded`。
 - GM API 来自 `vite-plugin-monkey`（代码里从 `'$'` 别名或 `vite-plugin-monkey/dist/client` 导入）：`GM_getValue/setValue`、`GM_addStyle`、`GM_cookie`、`GM_xmlhttpRequest`、`unsafeWindow`。
 - 重型依赖走 CDN `externalGlobals`（Vue、localforage、lodash、dayjs、hls.js、m3u8-parser、photoswipe…），不打进包体。
-- 产物：`dist/115master.user.js` + `dist/115master.meta.js`。
+- 产物：`dist/115master-fusion.user.js` + `dist/115master-fusion.meta.js`。
 
 ### 用户设置与主题
 
-- `userSettings`（`utils/userSettings.ts`）— `Proxy` 包裹 `GM_getValue/setValue`（命名空间 `USER_SETTINGS`），`.value` 读写、`.watch(key, cb)` 响应变化。现有字段：`enableFilelistPreview`、`theme`。
+- `userSettings`（`utils/userSettings.ts`）— `Proxy` 包裹 `GM_getValue/setValue`（命名空间 `USER_SETTINGS`），`.value` 读写、`.watch(key, cb)` 响应变化。现有字段：文件预览、番号资料、演员头像、播放页影片详情和主题。
+- `useUserSetting(key)` — 按设置键缓存共享 `shallowRef`，每个键只注册一组 Vue 双向监听。
 - `utils/theme.ts` — `data-theme` 写到 `#my-app`，支持 `system/light/dark`；`userSettings.theme` 驱动，系统主题变化时 `resolvedTheme` 回填。
 
 ## 开发
 
 - `pnpm dev` — **按 git 分支派生 dev server**：用分支名 FNV-1a 哈希映射端口（base 5180），脚本名加分支后缀，多分支可并行不冲突；打开 `https://115.com/?bn=<branch>`。可用 `BRANCH_PORT` 手动覆盖端口（见 `plugins/dev.ts`）。
 - HTTPS dev 由 `vite-plugin-mkcert` 提供（115 要求 https）。
-- `dev:plus` / `build:plus` — 设 `VITE_PLUS_VERSION=true`，实验功能用 `import.meta.env.VITE_PLUS_VERSION` 判断（也等价于 `constants` 里的 `PLUS_VERSION`）。
+- 旧版增强与播放页影片详情走 `userSettings` 运行时开关，不再区分 Plus 构建。
 - type-check：`vue-tsc`，依赖 `@libmedia/*` 的 ESM 子路径 alias（见 `tsconfig.app.json`）。
 - 测试：`pnpm test`（inertness 检查 + vitest projects：unit / storybook-dark / storybook-light）；单测过滤 `pnpm vitest run <pattern>`。业务 E2E：`pnpm test:e2e`（含构建）/ `pnpm test:e2e:run`（跳过构建，离线 harness，可 `--shard=i/n` 分片）——命令与并行规约详见 `docs/agents/verification.md`。
 

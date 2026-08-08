@@ -5,15 +5,22 @@ import { imageCache } from '@/utils/cache'
 import { appLogger } from '@/utils/logger'
 import { FileItemModBase } from './base'
 
+/** 演员头像增强共用日志。 */
+const logger = appLogger.sub('FileItemModActressInfo')
+
 /**
  * FileItemMod 演员信息
  */
 export class FileItemModActressInfo extends FileItemModBase {
-  readonly IS_PLUS = true
-  /** 日志 */
-  protected logger = appLogger.sub('FileItemModActressInfo')
+  readonly SETTING_KEYS = ['enableActressFaces'] as const
+  private actressDom: HTMLImageElement | null = null
+  private loadId = 0
+  private objectUrl: string | null = null
 
   async onLoad() {
+    const loadId = ++this.loadId
+    logger.info('开始加载旧版页面演员头像')
+
     // 如果文件列表类型为网格，则不加载演员信息
     if (this.itemInfo.fileListType === FileListType.grid) {
       return
@@ -23,7 +30,8 @@ export class FileItemModActressInfo extends FileItemModBase {
     const actress = await actressFaceDB.findActress(
       this.itemInfo.attributes.title.trim(),
     )
-    if (!actress) {
+    if (!actress || loadId !== this.loadId) {
+      logger.info('旧版页面演员头像加载完成，无匹配头像')
       return
     }
 
@@ -33,6 +41,7 @@ export class FileItemModActressInfo extends FileItemModBase {
     actressDom.loading = 'lazy'
     actressDom.className = 'actress-info-img'
     this.itemNode.querySelector('.file-name-wrap')?.prepend(actressDom)
+    this.actressDom = actressDom
 
     try {
       /** 尝试从缓存获取图片 */
@@ -40,7 +49,8 @@ export class FileItemModActressInfo extends FileItemModBase {
       const cachedImage = await imageCache.get(cacheKey)
 
       if (cachedImage) {
-        actressDom.src = URL.createObjectURL(cachedImage.value)
+        this.objectUrl = URL.createObjectURL(cachedImage.value)
+        actressDom.src = this.objectUrl
       }
       else {
         actressDom.src = actress.url
@@ -62,16 +72,28 @@ export class FileItemModActressInfo extends FileItemModBase {
           }
         }
         catch (error) {
-          this.logger.error('缓存演员头像失败:', error)
+          logger.error('缓存演员头像失败:', error)
         }
       }
     }
     catch (error) {
       // 出错时直接使用原始URL
-      this.logger.error('加载演员头像缓存失败:', error)
+      logger.error('加载演员头像缓存失败:', error)
       actressDom.src = actress.url
     }
+
+    logger.info('旧版页面演员头像加载完成')
   }
 
-  onDestroy() {}
+  onDestroy() {
+    logger.info('开始卸载旧版页面演员头像')
+    this.loadId += 1
+    this.actressDom?.remove()
+    this.actressDom = null
+    this.itemNode.classList.remove('with-actress-info')
+    if (this.objectUrl)
+      URL.revokeObjectURL(this.objectUrl)
+    this.objectUrl = null
+    logger.info('旧版页面演员头像卸载完成')
+  }
 }

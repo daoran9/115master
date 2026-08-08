@@ -5,9 +5,7 @@
 ```bash
 pnpm install              # Node >= 20.12, pnpm 9.x
 pnpm dev                  # turbo 并行启动所有 packages 的 dev
-pnpm dev:plus             # VITE_PLUS_VERSION=true — monkey plus 版
 pnpm build                # turbo 并行 build
-pnpm build:plus           # plus 版 build
 pnpm type-check           # vue-tsc / tsc --noEmit (全包)
 pnpm test                 # vitest run (全包)
 pnpm lint                 # eslint
@@ -28,9 +26,7 @@ pnpm clean:cache          # 清理 Turbo / Vite / Rollup / TypeScript 构建缓�
 pnpm clean                # 清理所有 dist、构建缓存及根目录 node_modules
 ```
 
-> **Plus 版**：`dev:plus` / `build:plus` 设置 `VITE_PLUS_VERSION=true`，用于 monkey 的实验性 plus 分支（功能差异由 `@apps/monkey` 内 `import.meta.env.VITE_PLUS_VERSION` 决定）。
->
-> **Pre-commit hook**：`simple-git-hooks` 在每次 `git commit` 前自动跑 `pnpm type-check && pnpm lint-staged`。lint-staged 仅对暂存文件跑 `eslint --fix`。
+> **Pre-commit hook**：`simple-git-hooks` 在每次 `git commit` 前自动跑 `pnpm type-check && pnpm lint && pnpm lint:fix`。
 >
 > **E2E 分片/过滤**：`pnpm test:e2e` 含构建（共享产物，不可并行）；跳过构建用 `pnpm --filter @115master/monkey test:e2e:run`——分片追加 `--shard=i/n`，按目录过滤追加 `specs/<子目录>`（参数直接追加在脚本名后，不能加 `--` 分隔符，否则被 Playwright 吞掉跑全量；根 `pnpm test:e2e:run` 不转发参数，仅纯跑全量）。验证平台与并行规约详见 `docs/agents/verification.md`。
 

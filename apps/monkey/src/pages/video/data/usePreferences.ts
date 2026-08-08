@@ -12,6 +12,8 @@ export interface PlayerPreferences {
   playbackRate: number
   /** 显示播放列表 */
   showPlaylist: boolean
+  /** 剧院模式 */
+  theatre: boolean
   /** 自动加载缩略图 */
   autoLoadThumbnails: boolean
   /** 禁用HDR */
@@ -40,6 +42,7 @@ const DEFAULT_PREFERENCES: PlayerPreferences = {
   muted: true,
   playbackRate: 1,
   showPlaylist: false,
+  theatre: false,
   autoLoadThumbnails: true,
   disabledHDR: false,
   thumbnailsSamplingInterval: 60,

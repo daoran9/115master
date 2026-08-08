@@ -40,7 +40,7 @@ export function detectBranch(): string {
 }
 
 function devName(branch: string): string {
-  return branch ? `115Master-${branch}` : '115Master'
+  return branch ? `115Master Fusion-${branch}` : '115Master Fusion'
 }
 
 function devServer(branch: string, branchPort?: string) {

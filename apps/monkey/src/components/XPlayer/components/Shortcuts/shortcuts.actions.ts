@@ -187,6 +187,16 @@ const PLAY_ACTION_MAP = withGroup({
 /** 窗口动作 */
 const WINDOW_ACTION_MAP = withGroup({
   /**
+   * 切换剧院模式
+   */
+  toggleTheatre: {
+    name: '切换剧院模式',
+    keydown: (ctx) => {
+      ctx.fullscreen?.toggleTheatre()
+    },
+  },
+
+  /**
    * 切换全屏
    */
   toggleFullscreen: {

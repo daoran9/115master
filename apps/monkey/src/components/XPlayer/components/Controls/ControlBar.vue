@@ -81,6 +81,8 @@
             <PlayerControlSurface>
               <!-- 画中画 -->
               <PipButton />
+              <!-- 剧院模式 -->
+              <TheatreButton />
               <!-- 全屏控制 -->
               <FullscreenButton />
             </PlayerControlSurface>
@@ -107,6 +109,7 @@ import PlayerControlSurface from './PlayerControlSurface'
 import ProgressBar from './ProgressBar.vue'
 import QualityButton from './QualityButton.vue'
 import SubtitleButton from './SubtitleButton.vue'
+import TheatreButton from './TheatreButton.vue'
 import TimeDisplay from './TimeDisplay.vue'
 import TransformButton from './TransformButton.vue'
 import VideoEnhanceSettings from './VideoEnhanceSettings.vue'

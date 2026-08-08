@@ -60,6 +60,36 @@ test.describe('主题与设置', () => {
     expect(errors).toEqual([])
   })
 
+  test('增强设置默认开启并可持久化播放页影片详情开关', async ({ page }) => {
+    const errors = watch(page)
+    await setupVideo(page)
+    await page.goto(MASTER_URL)
+
+    await page.locator('button[title="偏好设置"]:visible').click()
+    const dialog = page.locator('.ui-dialog')
+    await dialog.getByRole('button', { name: '增强' }).click()
+
+    const labels = ['文件视频封面', '番号资料', '演员头像', '播放页影片详情']
+    for (const label of labels)
+      await expect(dialog.getByRole('checkbox', { name: label })).toBeChecked()
+
+    await dialog.getByRole('checkbox', { name: '播放页影片详情' }).click()
+    const store = await gmStore(page)
+    expect((store.USER_SETTINGS as { enablePlayerMovieInfo?: boolean } | undefined)?.enablePlayerMovieInfo).toBe(false)
+    expect(errors).toEqual([])
+  })
+
+  test('播放页影片详情按 GM 开关显示或隐藏', async ({ page }) => {
+    const errors = watch(page)
+    await setupVideo(page, {
+      gmValues: { USER_SETTINGS: { enablePlayerMovieInfo: false } },
+    })
+    await page.goto(videoUrl(EPISODES[0].pc))
+
+    await expect(page.getByText('暂无影片信息，可能番号无法识别')).toHaveCount(0)
+    expect(errors).toEqual([])
+  })
+
   test('移动端偏好设置使用 Dialog 式导航 Sheet', async ({ page }) => {
     const errors = watch(page)
     await page.setViewportSize({ width: 390, height: 844 })
@@ -83,12 +113,16 @@ test.describe('主题与设置', () => {
     await expect(panel).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)')
 
     const bounds = await panel.boundingBox()
+    const viewport = await page.evaluate(() => ({
+      width: document.body.clientWidth,
+      height: window.innerHeight,
+    }))
 
     if (!bounds)
       throw new Error('Navigation Sheet did not expose measurable bounds.')
     expect(bounds.x).toBe(0)
-    expect(bounds.width).toBe(390)
-    expect(bounds.y + bounds.height).toBe(844)
+    expect(bounds.width).toBe(viewport.width)
+    expect(bounds.y + bounds.height).toBe(viewport.height)
     expect(bounds.height).toBe(633)
     await expect(panel).toHaveCSS('border-top-left-radius', '32px')
     await expect(panel).toHaveCSS('border-bottom-left-radius', '0px')

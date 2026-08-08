@@ -14,7 +14,7 @@ flowchart LR
   end
 
   subgraph BUILD[串行构建 · 不可并行]
-    US["userscript<br/>apps/monkey/dist/115master.user.js"]
+    US["userscript<br/>apps/monkey/dist/115master-fusion.user.js"]
     SB["storybook-static × 2<br/>packages/ui + apps/monkey"]
   end
 
@@ -51,7 +51,7 @@ sequenceDiagram
   Sup->>Net: 注册 mock handler（defaults + spec 的 override 插队首）
   Spec->>Page: goto HOME_URL / MASTER_URL
   Net-->>Page: fulfill fixture HTML（homeHtml 官方 DOM / masterHtml 空壳）
-  Sup->>Page: 注入 dist/115master.user.js
+  Sup->>Page: 注入 dist/115master-fusion.user.js
   Page->>Page: main.ts 按 URL 分发<br/>HOME Mod 增强 / MASTER SPA 挂载 #my-app
   loop 页面运行时
     Page->>Net: API 请求（webapi / proapi / my.115.com…）

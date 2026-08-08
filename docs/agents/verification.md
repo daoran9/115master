@@ -32,7 +32,7 @@ flowchart TD
 - Playwright 纯路由拦截：零端口、零服务器、完全离线。单条 `page.route('**/*')` 通配路由按注册顺序匹配 handler；全部不匹配 → abort（网络沙箱，任何未 mock 的请求不会出网）。
 - 一键装配：`setupHarness(page, { gmValues, mocks })`（`e2e/support/index.ts`）—— GM_* 桩 + CDN 全局（vue / hls.js 等，文件取自 node_modules，与 `@require` 一一对应）+ mock API + userscript 注入。
 - URL 常量：`HOME_URL`（官方首页增强模式）、`MASTER_URL`（独立 SPA）。
-- userscript 直接注入 `apps/monkey/dist/115master.user.js` —— dist 是多 agent 共享的构建产物，跑 E2E 前只需构建一次。
+- userscript 直接注入 `apps/monkey/dist/115master-fusion.user.js` —— dist 是多 agent 共享的构建产物，跑 E2E 前只需构建一次。
 
 ### ③ 视觉回归（`tests/visual/`）
 

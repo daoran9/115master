@@ -4,18 +4,24 @@ import { createApp } from 'vue'
 import ExtInfo from '@/pages/home/components/ExtInfo/index.vue'
 import { FileListType, FileType, IvType } from '@/pages/home/types'
 import mainStyles from '@/styles/main.css?inline'
+import { appLogger } from '@/utils/logger'
 import { FileItemModBase } from './base'
+
+/** 番号资料增强共用日志。 */
+const logger = appLogger.sub('FileItemModExtInfo')
 
 /**
  * FileItemMod 扩展信息
  */
 export class FileItemModExtInfo extends FileItemModBase {
-  readonly IS_PLUS = true
-  readonly ENABLE_KEY_IN_USER_SETTING = 'enableFilelistPreview'
+  readonly SETTING_KEYS = ['enableAvInfo'] as const
 
+  private container: HTMLDivElement | null = null
   private vueApp: App | null = null
 
   onLoad() {
+    logger.info('开始加载旧版页面番号资料')
+
     // 如果文件列表类型为网格，则不加载扩展信息
     if (this.itemInfo.fileListType === FileListType.grid) {
       return
@@ -40,6 +46,7 @@ export class FileItemModExtInfo extends FileItemModBase {
     const extInfoContainer = document.createElement('div')
     extInfoContainer.style.width = '100%'
     this.itemNode.append(extInfoContainer)
+    this.container = extInfoContainer
 
     /** 创建 shadow DOM */
     const shadowRoot = extInfoContainer.attachShadow({ mode: 'open' })
@@ -62,12 +69,21 @@ export class FileItemModExtInfo extends FileItemModBase {
     })
     app.mount(extInfoDom)
     this.vueApp = app
+    logger.info('旧版页面番号资料加载完成')
   }
 
   onDestroy() {
+    logger.info('开始卸载旧版页面番号资料')
+    const app = this.vueApp
+    this.vueApp = null
+
     /** 延迟卸载 Vue，避免阻塞新的文件列表加载 */
     defer(() => {
-      this.vueApp?.unmount()
+      app?.unmount()
     })
+    this.container?.remove()
+    this.container = null
+    this.itemNode.classList.remove('with-ext-info')
+    logger.info('旧版页面番号资料卸载完成')
   }
 }

@@ -1,7 +1,6 @@
 import type { FileItemModBase, FileListMod } from './FileItemMod/base'
 import type { FileItemAttributes, FileListType, ItemInfo } from '@/pages/home/types'
 import { time } from '@115master/utils'
-import { PLUS_VERSION } from '@/constants'
 import { getAvNumber } from '@/utils/getNumber'
 
 /**
@@ -62,10 +61,6 @@ export class FileItemModLoader {
   async load() {
     this.mods.forEach((Mod) => {
       const mod = new Mod(this.itemNode, this.itemInfo)
-      // 如果 mod 是 Plus 功能，并且没有 PLUS_VERSION，则不加载
-      if (mod.IS_PLUS && !PLUS_VERSION) {
-        return
-      }
       mod.load()
       this.loadedMods.push(mod)
     })

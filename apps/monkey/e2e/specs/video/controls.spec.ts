@@ -37,6 +37,43 @@ test.describe('控制栏', () => {
     expect(errors).toEqual([])
   })
 
+  test('剧院模式按钮与快捷键 v 切换全宽布局并持久化', async ({ page }) => {
+    const errors = watch(page)
+    await setupVideo(page)
+    await page.goto(videoUrl(EPISODES[0].pc))
+    await showControls(page)
+
+    const root = page.locator('[data-video-page]')
+    const shell = page.locator('[data-video-player-shell]')
+    const normal = await shell.boundingBox()
+    if (!normal)
+      throw new Error('播放器容器无法测量')
+    expect(normal.width).toBeLessThan(1440)
+
+    await page.locator('button[title^="剧院模式"]').click()
+    await expect(root).toHaveAttribute('data-theatre', 'true')
+    await expect(page.locator('button[title^="正常模式"]')).toBeVisible()
+    const theatre = await shell.boundingBox()
+    if (!theatre)
+      throw new Error('剧院模式播放器容器无法测量')
+    const viewport = await page.evaluate(() => ({
+      width: window.innerWidth,
+      height: window.innerHeight,
+    }))
+    expect(theatre.x).toBe(0)
+    expect(theatre.y).toBe(0)
+    expect(theatre.width).toBe(viewport.width)
+    expect(theatre.height).toBe(viewport.height)
+
+    const stored = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('x-player-preferences') ?? '{}'))
+    expect(stored.theatre).toBe(true)
+
+    await page.keyboard.press('v')
+    await expect(root).toHaveAttribute('data-theatre', 'false')
+    expect(errors).toEqual([])
+  })
+
   test('画质菜单列出可用源并可选中', async ({ page }) => {
     const errors = watch(page)
     await setupVideo(page, { download: true })

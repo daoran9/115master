@@ -54,13 +54,13 @@ jobs:
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Abort if No Changes
+      - name: Use Committed Version
         if: steps.changes.outputs.has_changes == 'false'
         run: |
-          echo "::error::No pending changesets found. Run 'pnpm changeset' to create one before releasing."
-          exit 1
+          echo "No pending changesets. Releasing the committed package version."
 
       - name: Commit Version Changes
+        if: steps.changes.outputs.has_changes == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -93,8 +93,8 @@ jobs:
           name: v${{ steps.version.outputs.version }}
           body: ${{ steps.notes.outputs.body }}
           files: |
-            apps/monkey/dist/115master.user.js
-            apps/monkey/dist/115master.meta.js
+            apps/monkey/dist/115master-fusion.user.js
+            apps/monkey/dist/115master-fusion.meta.js
 
       - name: Notify Telegram
         if: success()
@@ -105,8 +105,8 @@ jobs:
           format: markdown
           disable_web_page_preview: true
           message: |
-            🚀 *115Master v${{ steps.version.outputs.version }}* Released! -- From Bot
+            🚀 *115Master Fusion v${{ steps.version.outputs.version }}* Released! -- From Bot
 
             ${{ steps.notes.outputs.body }}
 
-            [GitHub Release](https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}) | [Install Script](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/115master.user.js)
+            [GitHub Release](https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}) | [Install Script](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/115master-fusion.user.js)

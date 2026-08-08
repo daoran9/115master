@@ -6,6 +6,7 @@ import { unrefElement } from '@vueuse/core'
 import { defineComponent, withModifiers } from 'vue'
 import { useContextmenu } from '@/hooks/useContextmenu'
 import { useLongPress } from '@/hooks/useLongPress'
+import ExtInfo from '@/pages/home/components/ExtInfo/index.vue'
 import { getFilesItemId } from '@/utils/filesItem'
 import { FileDndSource, FileDndTarget } from '../FileDnd'
 import { Link } from '../Link'
@@ -92,6 +93,8 @@ const FileItem = defineComponent({
       itemRef,
       isVideo,
       isFolder,
+      avNumber,
+      showAvInfo,
       link,
       hasActressCover,
       hasVideoCover,
@@ -189,6 +192,7 @@ const FileItem = defineComponent({
             data-[view-type=card]:flex-col
             data-[view-type=card]:rounded-2xl
             data-[view-type=card]:data-[checked=true]:ring-6
+            data-[view-type=list]:flex-wrap
             data-[view-type=list]:items-stretch
             max-sm:select-none
             max-sm:[-webkit-touch-callout:none]
@@ -272,6 +276,17 @@ const FileItem = defineComponent({
                 pathSelect={props.pathSelect}
               />
             </Link>
+
+            {showAvInfo.value && avNumber.value && !props.pathSelect && (
+              <div
+                class="
+                  border-base-content/10 w-full border-t
+                  group-data-[select-mode=true]:hidden
+                "
+              >
+                <ExtInfo avNumber={avNumber.value} variant="drive" />
+              </div>
+            )}
           </div>
         ) }}
       </FileDndTarget>

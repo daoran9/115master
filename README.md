@@ -1,104 +1,129 @@
 <div align="center">
 
-<p align="center"><img src="./apps/monkey/src/assets/logo-wordmark.svg" alt="115Master" width="360" /></p>
+<p><img src="./apps/monkey/src/assets/logo-wordmark.svg" alt="115Master Fusion" width="500" /></p>
 
-<br/>
-
-[![GitHub Release](https://img.shields.io/github/v/release/cbingb666/115master?logo=github)](https://github.com/cbingb666/115master/releases/latest)
-[![GitHub Downloads](https://img.shields.io/github/downloads/cbingb666/115master/115master.user.js?displayAssetName=false&logo=Github)](https://github.com/cbingb666/115master/releases)
-[![Last Commit](https://img.shields.io/github/last-commit/cbingb666/115master?logo=github)](https://github.com/cbingb666/115master/commits/main)
-[![License](https://img.shields.io/github/license/cbingb666/115master)](LICENSE)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/cbingb666/115master)
-
-<br/>
-
-![preview](https://github.com/user-attachments/assets/b0106128-ccb1-429f-8c4e-43b9f3d9d81d)
+[![GitHub Release](https://img.shields.io/github/v/release/daoran9/115master?include_prereleases&logo=github)](https://github.com/daoran9/115master/releases)
+[![GitHub Downloads](https://img.shields.io/github/downloads/daoran9/115master/115master-fusion.user.js?logo=github)](https://github.com/daoran9/115master/releases)
+[![License](https://img.shields.io/github/license/daoran9/115master)](LICENSE)
 
 </div>
 
+`115Master Fusion` 基于上游未发布的 v2 分支，融合旧版增强功能。脚本使用独立名称、namespace 和更新源，不会被官方 `115Master` 自动更新覆盖。
+
+当前版本：`2.0.0-beta.1`。
+
+## 使用前
+
+请停用官方 `115Master`。两个脚本会接管相同页面，不能同时运行。
+
+运行环境：
+
+- Chrome 130+ 或 115Browser 35+
+- Tampermonkey 5.3.3+ 或 ScriptCat
+- 浏览器扩展开发者模式已开启
+
+安装文件：[`115master-fusion.user.js`](https://github.com/daoran9/115master/releases/latest/download/115master-fusion.user.js)
+
 ## 功能
 
-**播放器:**
+### 新版 115 页面
 
-- Ultra 画质
+- 匹配全部 `https://115.com/*` 页面
+- 右下角显示隔离的 MASTER 入口
+- 入口不依赖官方 DOM 类名
+- 新版单页应用重绘页面后自动恢复入口
+- 点击后打开独立 MASTER 文件管理器
+
+### MASTER 文件管理器
+
+- 列表和卡片视图
+- 路径导航、全局搜索、分页、排序和滚动位置恢复
+- 多选、框选、拖拽移动和右键菜单
+- 新建文件夹、置顶、星标、移动、重命名、标签和删除
+- Magnet 离线任务
+- 视频封面、番号资料和演员头像
+- 图片及文件夹预览
+- 浅色、深色和跟随系统主题
+
+### 播放器
+
+- Ultra 原画和多画质切换
 - 视频缩略图
-- 在线字幕
-- [IINA](https://iina.io/) 播放
-- 画中画
-- 播放列表
+- 115、迅雷和 SubtitleCat 字幕
+- IINA 唤起
+- 播放列表和连续播放
+- 剧院模式，默认快捷键 `V`
+- 全屏和画中画
 - 自定义快捷键
-- 视频色彩调整
+- 旋转、翻转和视频色彩调整
+- JavDB、JavBus 影片详情
+- 文件星标、移动、重命名和删除
 
-**文件列表:**
+### 旧版官方页面
 
-- 视频封面
-- 标题显示路径
-- 返回目录按钮
-- 记忆滚动位置
-- 离线任务免刷新重定向
-- 文件下载（仅支持单文件）
-- 文件夹鼠标中键新标签页打开
+检测到旧版文件列表 DOM 时，继续加载原注入式增强：
 
-**Magnet:**
+- 文件视频封面
+- 番号资料
+- 演员头像
+- MASTER 播放和 IINA 播放
+- 单文件下载
+- 文件夹中键新标签页打开
+- 路径标题、返回目录和滚动位置记忆
 
-支持 [任何网站的 Magnet 链接一键唤起离线任务](https://github.com/cbingb666/115master/discussions/238)。
+## 增强开关
 
-## 安装
+在 `偏好设置 -> 增强` 中可分别控制：
 
-1. 使用 `Chrome 130+` 或 `115Browser 35+` 浏览器。
+- 文件视频封面
+- 番号资料
+- 演员头像
+- 播放页影片详情
 
-2. 安装 [Tampermonkey v5.3.3+](https://www.tampermonkey.net/) 或 [ScriptCat](https://github.com/scriptscat/scriptcat/blob/main/README_zh-CN.md#-%E5%AE%89%E8%A3%85%E6%89%A9%E5%B1%95)。
+开关保存在 Tampermonkey 的 `USER_SETTINGS` 中。旧版页面增强会实时卸载或重新挂载。
 
-3. 开启 [浏览器扩展开发者模式](https://www.tampermonkey.net/faq.php#Q209)。
+## 固定入口
 
-4. 安装 [115Master](https://github.com/cbingb666/115master/releases/latest/download/115master.user.js)。
+MASTER 文件管理器：
 
-## 开放功能
+```text
+https://115.com/web/lixian/master/#/drive
+```
 
-支持其他插件或应用通过 URL 唤起 115Master 的播放器
+播放器：
 
-**示例:**
+```text
+https://115.com/web/lixian/master/#/video/<pick_code>
+```
 
-`https://115.com/web/lixian/master/video/?pick_code=${pick_code}`
+## 开发
 
-**参数:**
+```bash
+pnpm install --frozen-lockfile
+pnpm type-check
+pnpm lint
+pnpm test
+pnpm test:e2e
+pnpm build
+```
 
-| Query     | Required | Description |
-| --------- | -------- | ----------- |
-| pick_code | 是       | 文件提取码  |
+构建产物：
 
-## 常见问题
+```text
+apps/monkey/dist/115master-fusion.user.js
+apps/monkey/dist/115master-fusion.meta.js
+```
 
-[Q&A](https://github.com/cbingb666/115master/discussions/categories/q-a)
+## 上游与许可
 
-## 贡献
+上游项目：[cbingb666/115master](https://github.com/cbingb666/115master)
 
-欢迎贡献代码！请查阅 [CONTRIBUTING.md](CONTRIBUTING.md) 了解开发环境搭建和工作流程。
+原作者：[@cbingb666](https://github.com/cbingb666)
 
-## 鸣谢
+Fusion 维护：[@daoran9](https://github.com/daoran9)
 
-[@zhaohappy](https://github.com/zhaohappy) 提供了 [AvPlayer](https://zhaohappy.github.io/libmedia/docs/guide/player)
-
-## 赞助
-
-[为爱发电~ 为 Master 添把柴火🔥](https://afdian.com/a/115Master)
-
-## 许可证
-
-[MIT](LICENSE)
+项目继续使用 [MIT](LICENSE) 许可证。原项目赞助入口保留给原作者。
 
 ## 免责声明
 
-本软件仅供技术研究、学习和交流目的使用。使用者应遵守以下条款：
-
-本软件仅作为编程技术探讨与计算机安全研究的示例工具，不得用于任何商业用途或非法活动。
-
-使用者需在合法、合规的环境下使用本软件，并需获得相关系统或软件所有者的明确授权。
-
-开发者不对使用者因使用本软件造成的任何直接或间接损失负责，包括但不限于数据丢失、系统损坏或法律责任。
-
-使用本软件即表示您已完全理解并同意本免责声明的全部内容，并承担因使用本软件产生的一切后果和法律责任。
-
-如本软件功能可能违反任何法律法规或第三方权益，请立即停止使用并删除。
-
-请尊重知识产权，遵守相关法律法规，合法、合理地开展技术研究活动。
+本软件仅供技术研究、学习和交流。使用者应遵守当地法律法规、115 服务条款和第三方权益要求，并自行承担使用风险。

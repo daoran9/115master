@@ -6,28 +6,28 @@
     <div :class="styles.badges.container">
       <!-- github -->
       <a :href="info.homepage" target="_blank" :class="styles.badges.link">
-        <img src="https://img.shields.io/badge/GitHub-115Master-yellow" alt="GitHub" :class="styles.badges.image">
+        <img src="https://img.shields.io/badge/GitHub-115Master_Fusion-yellow" alt="GitHub" :class="styles.badges.image">
       </a>
 
       <!-- version v1.0.0-beta -->
-      <a :href="`https://github.com/cbingb666/115Master/releases/tag/v${info.version}`" target="_blank" :class="styles.badges.link">
+      <a :href="`${info.homepage}/releases/tag/v${info.version}`" target="_blank" :class="styles.badges.link">
         <img :src="`https://img.shields.io/badge/Version-${info.version.replace(/-/g, '.')}-green`" alt="Version" :class="styles.badges.image">
       </a>
 
-      <!-- 作者 -->
-      <a href="https://github.com/cbingb666" target="_blank" :class="styles.badges.link">
-        <img :src="`https://img.shields.io/badge/Author-${info.author}-red`" alt="Author" :class="styles.badges.image">
+      <!-- 维护者 -->
+      <a href="https://github.com/daoran9" target="_blank" :class="styles.badges.link">
+        <img src="https://img.shields.io/badge/Maintainer-daoran9-red" alt="Maintainer" :class="styles.badges.image">
       </a>
     </div>
 
     <div :class="styles.badges.container">
       <!-- license -->
-      <a href="https://github.com/cbingb666/115master/blob/main/LICENSE" target="_blank" :class="styles.badges.link">
+      <a :href="`${info.homepage}/blob/v2/LICENSE`" target="_blank" :class="styles.badges.link">
         <img src="https://img.shields.io/badge/License-MIT-green" alt="License" :class="styles.badges.image">
       </a>
 
       <!-- issues -->
-      <a href="https://github.com/cbingb666/115master/issues" target="_blank" :class="styles.badges.link">
+      <a :href="info.supportURL" target="_blank" :class="styles.badges.link">
         <img src="https://img.shields.io/badge/Issues-red" alt="Issues" :class="styles.badges.image">
       </a>
 
@@ -68,6 +68,7 @@ const info = computed(() => {
     version: GM_info.script.version,
     author: GM_info.script.author,
     homepage: GM_info.script.homepage,
+    supportURL: GM_info.script.supportURL,
     name: GM_info.script.name,
   }
 })

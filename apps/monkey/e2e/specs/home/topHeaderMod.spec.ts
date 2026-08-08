@@ -34,15 +34,15 @@ test.describe('TopHeaderMod', () => {
     await expect(preview.locator('iconify-icon.preview-on')).toBeAttached()
 
     /** 上传/新建下拉菜单 left 被修正到对应按钮位置 */
-    const fixed = await page.evaluate(() => {
-      const check = (name: string) => {
-        const tab = document.querySelector(`[data-dropdown-tab="${name}"]`)
-        const menu = document.querySelector<HTMLElement>(`[data-dropdown-content="${name}"]`)
-        return menu?.style.left === `${tab?.getBoundingClientRect().left}px`
-      }
-      return check('upload_btn_add_dir') && check('create_new_add_dir')
-    })
-    expect(fixed).toBe(true)
+    for (const name of ['upload_btn_add_dir', 'create_new_add_dir']) {
+      await expect.poll(() => page.evaluate((menuName) => {
+        const tab = document.querySelector(`[data-dropdown-tab="${menuName}"]`)
+        const menu = document.querySelector<HTMLElement>(`[data-dropdown-content="${menuName}"]`)
+        if (!tab || !menu)
+          return null
+        return Math.abs(Number.parseFloat(menu.style.left) - tab.getBoundingClientRect().left)
+      }, name)).toBeLessThan(0.01)
+    }
     expect(errors).toEqual([])
   })
 

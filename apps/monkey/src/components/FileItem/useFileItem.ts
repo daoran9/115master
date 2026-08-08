@@ -1,12 +1,14 @@
 import type { Share } from '@115master/drive115'
 import { useAsyncState } from '@vueuse/core'
-import { computed, shallowRef } from 'vue'
+import { computed, shallowRef, watch } from 'vue'
 import { useAppDialog } from '@/app/dialog'
 import { router } from '@/app/router'
 import { useFolderImagePreview } from '@/hooks/useFolderImagePreview'
 import { useSmartVideoCover } from '@/hooks/useVideoCover'
 import { actressFaceDB } from '@/utils/actressFaceDB'
+import { getAvNumber } from '@/utils/getNumber'
 import { openFilesItem, resolveFileLink } from '@/utils/openFilesItem'
+import { useUserSetting } from '@/utils/userSettings'
 
 interface ActressFaceDBActress {
   url: string
@@ -28,6 +30,9 @@ export function useFileItem(options: UseFileItemOptions) {
   const { data, onPreview } = options
   const dialog = useAppDialog()
   const itemRef = shallowRef<HTMLElement>()
+  const showPreview = useUserSetting('enableFilelistPreview')
+  const showAvInfo = useUserSetting('enableAvInfo')
+  const showActressFaces = useUserSetting('enableActressFaces')
 
   /** 添加 folder image preview 支持 */
   const folderPreview = options.cid
@@ -40,9 +45,10 @@ export function useFileItem(options: UseFileItemOptions) {
 
   const isVideo = computed(() => data.iv === 1)
   const isFolder = computed(() => data.fc === 0)
+  const avNumber = computed(() => getAvNumber(data.n))
 
   const actressAsyncState = useAsyncState(async () => {
-    if (!isFolder.value) {
+    if (!showActressFaces.value || !isFolder.value) {
       return null
     }
     await actressFaceDB.init()
@@ -50,6 +56,11 @@ export function useFileItem(options: UseFileItemOptions) {
     return actress as ActressFaceDBActress | null
   }, null, {
     immediate: true,
+  })
+
+  watch(showActressFaces, (enabled) => {
+    if (enabled)
+      actressAsyncState.execute()
   })
 
   const coverOptions = computed(() => ({
@@ -66,11 +77,14 @@ export function useFileItem(options: UseFileItemOptions) {
   const link = computed(() => resolveFileLink(data))
 
   const hasActressCover = computed(() =>
-    actressAsyncState.isReady.value && !!actressAsyncState.state.value,
+    showActressFaces.value
+    && actressAsyncState.isReady.value
+    && !!actressAsyncState.state.value,
   )
 
   const hasVideoCover = computed<boolean>(() =>
-    isVideo.value
+    showPreview.value
+    && isVideo.value
     && !!videoCoverResult?.videoCover.isReady
     && videoCoverResult.videoCover.state.length > 0,
   )
@@ -94,6 +108,8 @@ export function useFileItem(options: UseFileItemOptions) {
     itemRef,
     isVideo,
     isFolder,
+    avNumber,
+    showAvInfo,
     link,
     hasActressCover,
     hasVideoCover,

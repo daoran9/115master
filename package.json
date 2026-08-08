@@ -1,17 +1,17 @@
 {
-  "name": "115master-monorepo",
+  "name": "115master-fusion-monorepo",
   "private": true,
   "packageManager": "pnpm@9.15.9",
-  "description": "115master monorepo",
-  "author": "cbingb666",
+  "description": "115Master Fusion monorepo",
+  "author": "cbingb666, daoran9",
   "license": "MIT",
-  "homepage": "https://github.com/cbingb666/115master",
+  "homepage": "https://github.com/daoran9/115master",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cbingb666/115master.git"
+    "url": "https://github.com/daoran9/115master.git"
   },
   "bugs": {
-    "url": "https://github.com/cbingb666/115master/issues"
+    "url": "https://github.com/daoran9/115master/issues"
   },
   "engines": {
     "node": ">=20.12"
@@ -19,8 +19,6 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "dev:plus": "cross-env VITE_PLUS_VERSION=true turbo run dev",
-    "build:plus": "cross-env VITE_PLUS_VERSION=true turbo run build",
     "type-check": "turbo run type-check",
     "test": "turbo run test",
     "test:watch": "turbo run test:watch",

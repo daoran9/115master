@@ -5,6 +5,11 @@ import { computed, createApp, defineComponent, h, nextTick, shallowRef } from 'v
 import DndRoot from '../../Dnd/DndRoot'
 import FileItem from '../FileItem'
 
+const fileItemState = vi.hoisted(() => ({
+  avNumber: null as string | null,
+  showAvInfo: true,
+}))
+
 vi.hoisted(() => {
   class MediaErrorStub {
     static readonly MEDIA_ERR_ABORTED = 1
@@ -24,6 +29,8 @@ vi.mock('../useFileItem', () => ({
     itemRef: shallowRef<HTMLElement>(),
     isVideo: computed(() => false),
     isFolder: computed(() => false),
+    avNumber: computed(() => fileItemState.avNumber),
+    showAvInfo: computed(() => fileItemState.showAvInfo),
     link: computed(() => ({ href: '#file' })),
     hasActressCover: computed(() => false),
     hasVideoCover: computed(() => false),
@@ -34,6 +41,19 @@ vi.mock('../useFileItem', () => ({
     },
     videoCoverResult: null,
     open: vi.fn(),
+  }),
+}))
+
+vi.mock('@/pages/home/components/ExtInfo/index.vue', () => ({
+  default: defineComponent({
+    props: {
+      avNumber: String,
+      variant: String,
+    },
+    setup: props => () => h('div', {
+      'data-ext-info': props.avNumber,
+      'data-variant': props.variant,
+    }),
   }),
 }))
 
@@ -87,9 +107,30 @@ afterEach(() => {
   vi.unstubAllGlobals()
   apps.splice(0).forEach(app => app.unmount())
   document.body.innerHTML = ''
+  fileItemState.avNumber = null
+  fileItemState.showAvInfo = true
 })
 
 describe('fileItem', () => {
+  it('列表文件识别到番号时挂载 drive 版资料卡', async () => {
+    fileItemState.avNumber = 'ABP-123'
+    const root = mountItem()
+    await nextTick()
+
+    const info = root.querySelector('[data-ext-info="ABP-123"]')
+    expect(info).not.toBeNull()
+    expect(info?.getAttribute('data-variant')).toBe('drive')
+  })
+
+  it('番号资料开关关闭时不挂载资料卡', async () => {
+    fileItemState.avNumber = 'ABP-123'
+    fileItemState.showAvInfo = false
+    const root = mountItem()
+    await nextTick()
+
+    expect(root.querySelector('[data-ext-info]')).toBeNull()
+  })
+
   it('把框选标识透传到真实根元素', () => {
     const root = document.createElement('div')
     document.body.appendChild(root)

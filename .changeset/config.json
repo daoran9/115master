@@ -2,13 +2,13 @@
   "$schema": "https://unpkg.com/@changesets/config@3.1.2/schema.json",
   "changelog": [
     "@changesets/changelog-github",
-    { "repo": "cbingb666/115master" }
+    { "repo": "daoran9/115master" }
   ],
   "commit": false,
   "fixed": [],
   "linked": [],
   "access": "restricted",
-  "baseBranch": "main",
+  "baseBranch": "v2",
   "updateInternalDependencies": "patch",
   "ignore": []
 }

@@ -6,6 +6,7 @@ import { spaceInfo } from './fixtures/space'
 import { userAq } from './fixtures/user'
 import { homeHtml } from './pages/homeHtml'
 import { masterHtml } from './pages/masterHtml'
+import { officialHtml } from './pages/officialHtml'
 
 /**
  * 路由式 mock：单条 page.route 通配路由内按注册顺序匹配 URL
@@ -117,6 +118,13 @@ export function defaults() {
     if (!request.isNavigationRequest())
       return
     return html(route, masterHtml())
+  })
+
+  /** 新版官方文件页（未知 DOM，仅验证兼容入口） */
+  api.use(/^https:\/\/115\.com\/web\/new-drive/, ({ route, request }) => {
+    if (!request.isNavigationRequest())
+      return
+    return html(route, officialHtml())
   })
 
   /** HOME 文档（官方文件列表 DOM） */

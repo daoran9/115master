@@ -1,5 +1,5 @@
-<svg id="lw-7k3m9x2q" viewBox="0 0 473 103" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" color="#1a1a1a">
-    <title>logo-wordmark</title>
+<svg id="lw-7k3m9x2q" viewBox="0 0 630 103" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" color="#1a1a1a">
+    <title>115Master Fusion</title>
     <style>
         @media (prefers-color-scheme: dark) {
             #lw-7k3m9x2q { color: #ffffff !important; }
@@ -34,8 +34,8 @@
                     <circle cx="120" cy="18" r="2" fill="currentColor"></circle>
                 </g>
             </g>
-            <text id="115Master" fill="url(#g)" fill-rule="nonzero" font-family="Sarasa-Gothic-SC-Bold, Sarasa Gothic SC" font-size="59" font-weight="bold" line-spacing="79">
-                <tspan x="150" y="68">115Master</tspan>
+            <text id="115Master-Fusion" fill="url(#g)" fill-rule="nonzero" font-family="Sarasa-Gothic-SC-Bold, Sarasa Gothic SC" font-size="52" font-weight="bold" line-spacing="70">
+                <tspan x="150" y="67">115Master Fusion</tspan>
             </text>
         </g>
     </g>

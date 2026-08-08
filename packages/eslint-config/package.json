@@ -5,16 +5,16 @@
   "private": true,
   "packageManager": "pnpm@9.15.9",
   "description": "Shared ESLint configurations",
-  "author": "cbingb666",
+  "author": "cbingb666, daoran9",
   "license": "MIT",
-  "homepage": "https://github.com/cbingb666/115master",
+  "homepage": "https://github.com/daoran9/115master",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cbingb666/115master.git",
+    "url": "https://github.com/daoran9/115master.git",
     "directory": "/packages/eslint-config"
   },
   "bugs": {
-    "url": "https://github.com/cbingb666/115master/issues"
+    "url": "https://github.com/daoran9/115master/issues"
   },
   "exports": {
     ".": "./index.js"

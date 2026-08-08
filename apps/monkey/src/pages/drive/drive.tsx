@@ -42,7 +42,7 @@ import './drive.css'
 const Drive = defineComponent({
   name: 'Drive',
   setup: () => {
-    useTitle('115Master')
+    useTitle('115Master Fusion')
 
     const store = useDriveStore()
 
