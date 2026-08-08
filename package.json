@@ -14,7 +14,7 @@
     "url": "https://github.com/daoran9/115master/issues"
   },
   "engines": {
-    "node": ">=20.12"
+    "node": ">=22.19"
   },
   "scripts": {
     "build": "turbo run build",

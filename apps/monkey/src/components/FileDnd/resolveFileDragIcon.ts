@@ -1,5 +1,5 @@
 import type { Share } from '@115master/drive115'
-import { I } from '@/icons'
+import { I } from '@/icons/registry'
 
 const IMAGE = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'tif', 'tiff', 'heic', 'heif']
 const AUDIO = ['mp3', 'flac', 'wav', 'aac', 'ogg', 'm4a', 'ape', 'wma']
