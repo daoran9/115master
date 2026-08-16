@@ -12,6 +12,7 @@ function seed(values?: Record<string, unknown>) {
 
 /** GM 桩的 localStorage 持久化键（页面内外共享） */
 export const GM_STORE_KEY = '__115master_e2e_gm_values__'
+export const GM_REQUESTS_KEY = '__115master_e2e_gm_requests__'
 
 /** 生成注入脚本内容 */
 export function gmInit(values?: Record<string, unknown>) {
@@ -19,6 +20,7 @@ export function gmInit(values?: Record<string, unknown>) {
   if (window.GM_xmlhttpRequest)
     return
   const STORE_KEY = '${GM_STORE_KEY}'
+  const REQUESTS_KEY = '${GM_REQUESTS_KEY}'
   const seed = ${seed(values)}
   const load = () => {
     try {
@@ -68,6 +70,13 @@ export function gmInit(values?: Record<string, unknown>) {
   }
 
   window.GM_xmlhttpRequest = (details) => {
+    window[REQUESTS_KEY] ??= []
+    window[REQUESTS_KEY].push({
+      url: details.url,
+      method: details.method || 'GET',
+      headers: { ...details.headers },
+      cookiePartition: details.cookiePartition,
+    })
     const controller = new AbortController()
     const timer = details.timeout
       ? setTimeout(() => controller.abort('timeout'), details.timeout)

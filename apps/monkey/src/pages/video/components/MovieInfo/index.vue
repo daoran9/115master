@@ -4,22 +4,15 @@
       <!-- 源切换 Tab -->
       <div :class="styles.tabs.container">
         <a
+          v-for="tab in sourceTabs"
+          :key="tab.key"
           :class="[
             styles.tabs.item,
-            activeSource === 'javDBState' ? styles.tabs.active : '',
+            activeSource === tab.key ? styles.tabs.active : '',
           ]"
-          @click="activeSource = 'javDBState'"
+          @click="activeSource = tab.key"
         >
-          JavDB
-        </a>
-        <a
-          :class="[
-            styles.tabs.item,
-            activeSource === 'javBusState' ? styles.tabs.active : '',
-          ]"
-          @click="activeSource = 'javBusState'"
-        >
-          JavBus
+          {{ tab.label }}
         </a>
       </div>
 
@@ -82,7 +75,7 @@
             >
               <div :class="styles.actors.avatarWrapper">
                 <div :class="styles.actors.avatarContainer">
-                  <Image :src="actor.face || DEFAULT_AVATAR" :alt="actor.name" class="aspect-square w-full rounded-full" fit="cover" />
+                  <Image :src="getActorImageSource(actor, movieInfo.state.value?.detailUrl)" :alt="actor.name" :loader="getActorLoader(actor, movieInfo.state.value?.detailUrl)" :fallback="getActorFallback(actor, movieInfo.state.value?.detailUrl)" class="aspect-square w-full rounded-full" fit="cover" @error="movieInfos.loadActorFaces()" />
                 </div>
                 <span
                   v-if="actor.sex !== undefined"
@@ -104,7 +97,7 @@
             >
               <div :class="styles.actors.avatarWrapper">
                 <div :class="styles.actors.avatarContainer">
-                  <Image :src="actor.face || DEFAULT_AVATAR" :alt="actor.name" class="aspect-square w-full rounded-full" fit="cover" />
+                  <Image :src="getActorImageSource(actor, movieInfo.state.value?.detailUrl)" :alt="actor.name" :loader="getActorLoader(actor, movieInfo.state.value?.detailUrl)" :fallback="getActorFallback(actor, movieInfo.state.value?.detailUrl)" class="aspect-square w-full rounded-full" fit="cover" @error="movieInfos.loadActorFaces()" />
                 </div>
                 <span
                   v-if="actor.sex !== undefined"
@@ -209,15 +202,27 @@
 
         <!-- 缩略图 -->
         <div ref="movieInfoThumb" :class="styles.thumbnails.container">
-          <a
-            v-for="(item) in movieInfo.state.value?.preview"
-            :key="item.thumbnail"
-            :class="styles.thumbnails.item"
-            :href="item.raw"
-            target="_blank"
+          <template
+            v-for="(item, index) in movieInfo.state.value?.preview"
+            :key="getPreviewKey(item, index)"
           >
-            <Image :src="item.raw || ''" alt="thumb" class="size-full" fit="cover" lazy />
-          </a>
+            <a
+              v-if="!failedPreviews.has(getPreviewKey(item, index))"
+              :class="styles.thumbnails.item"
+              :href="item.raw || item.thumbnail"
+              target="_blank"
+            >
+              <Image
+                :src="item.thumbnail || item.raw || ''"
+                alt="剧照"
+                :loader="getPreviewLoader(item, index, movieInfo.state.value?.detailUrl)"
+                :fallback="getPreviewFallback(item, index, movieInfo.state.value?.detailUrl, getPreviewKey(item, index))"
+                class="size-full"
+                fit="cover"
+                lazy
+              />
+            </a>
+          </template>
         </div>
       </template>
     </div>
@@ -227,9 +232,11 @@
 <script lang="ts" setup>
 import type { useDataMovieInfo } from '@/pages/video/data/useDataMovieInfo'
 import { format } from '@115master/utils'
+import PhotoSwipe from 'photoswipe'
 import PhotoSwipeLightbox from 'photoswipe/lightbox'
 import {
   computed,
+  h,
   nextTick,
   ref,
   watch,
@@ -240,12 +247,15 @@ import {
 } from '@/components'
 import { Image } from '@/components/Image'
 import { clsx } from '@/utils/clsx'
+import { createGMImageFallbackLoader } from '@/utils/imageLoader'
+import { appLogger } from '@/utils/logger'
 import CopyButton from './components/CopyButton.vue'
 import 'photoswipe/style.css'
 
 const props = defineProps<{
   movieInfos: ReturnType<typeof useDataMovieInfo>
 }>()
+const logger = appLogger.sub('MovieInfo')
 
 const styles = clsx({
   // 容器样式
@@ -274,7 +284,7 @@ const styles = clsx({
   // 头部样式
   header: {
     container: 'mb-6',
-    title: 'text-base-content pr-36 text-xl font-bold break-words break-all',
+    title: 'text-base-content pr-64 text-xl font-bold break-words break-all',
     titleText: '',
   },
   // 演员
@@ -312,15 +322,270 @@ const styles = clsx({
 
 const movieInfoThumb = ref<HTMLElement | null>(null)
 const lightbox = ref<PhotoSwipeLightbox | null>(null)
-const activeSource = ref<'javDBState' | 'javBusState'>('javDBState')
+const activeSource = ref('javDBState')
 
 /** 默认头像（灰色的人形轮廓） */
 const DEFAULT_AVATAR
   = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgM2MxLjY2IDAgMyAxLjM0IDMgM3MtMS4zNCAzLTMgMy0zLTEuMzQtMy0zIDEuMzQtMyAzLTN6bTAgMTQuMmMtMi41IDAtNC43MS0xLjI4LTYtMy4yMi4wMy0xLjk5IDQtMy4wOCA2LTMuMDggMS45OSAwIDUuOTcgMS4wOSA2IDMuMDgtMS4yOSAxLjk0LTMuNSAzLjIyLTYgMy4yMnoiLz48L3N2Zz4='
 
+interface ActorImageData {
+  name: string
+  url?: string
+  face?: string
+  faceReferer?: string
+}
+
+const sourceTabs = computed(() => props.movieInfos.sourceTabs.value)
+
+/** 把同名演员的各资料源头像合并为有序候选。 */
+function getActorImageCandidates(actor: ActorImageData, detailUrl?: string) {
+  /*
+   * ================================================================================
+   * 步骤1：合并播放器演员头像来源
+   * ================================================================================
+   * 目标：固定按 gfriends、影片资料源、MissAV 排序，不把通用占位图当头像。
+   * 数据源：gfriends 主选头像、播放器资料源演员和 MissAV 后备头像。
+   * 操作：
+   * 1) 用标准化姓名筛选同一演员
+   * 2) 按固定来源优先级去重头像并附带 Cookie 分区
+   */
+  logger.info('开始合并播放器演员头像来源', actor.name)
+
+  /** 1.1 gfriends 优先；影片资料源居中；MissAV 只作最终后备。 */
+  const actorName = normalizeActorName(actor.name)
+  const gfriendsActors = props.movieInfos.gfriendsActorFaces.value.map(candidate => ({
+    actor: candidate,
+    detailUrl: candidate.faceReferer,
+  }))
+  const sourceActors = sourceTabs.value.flatMap(tab =>
+    (tab.state.state.value?.actors ?? []).map(candidate => ({
+      actor: candidate,
+      detailUrl: tab.state.state.value?.detailUrl,
+    })))
+  const missAVActors = props.movieInfos.missAVActorFaces.value.map(candidate => ({
+    actor: candidate,
+    detailUrl: candidate.faceReferer,
+  }))
+  const matchedActors = [
+    ...gfriendsActors.filter(candidate => normalizeActorName(candidate.actor.name) === actorName),
+    ...sourceActors.filter(candidate => normalizeActorName(candidate.actor.name) === actorName),
+    { actor, detailUrl },
+    ...missAVActors.filter(candidate =>
+      normalizeActorName(candidate.actor.name) === actorName),
+  ]
+
+  /** 1.2 同一 URL 只请求一次，通用无图资源不进入候选链。 */
+  const usedUrls = new Set<string>()
+  const candidates = matchedActors.flatMap(({ actor: candidate, detailUrl: sourceDetailUrl }) => {
+    const face = candidate.face?.trim()
+    if (!face || isPlaceholderActorFace(face) || usedUrls.has(face))
+      return []
+    usedUrls.add(face)
+    const referer = candidate.url || candidate.faceReferer || sourceDetailUrl
+    return [{
+      url: face,
+      referer,
+      cookiePartition: getCookiePartition(referer),
+    }]
+  })
+
+  logger.info('播放器演员头像来源合并完成', actor.name, candidates.length)
+  return candidates
+}
+
+/** 统一演员姓名，避免来源间空格和全半角差异。 */
+function normalizeActorName(name: string) {
+  return name.normalize('NFKC').replace(/\s+/g, '').toLowerCase()
+}
+
+/** 排除来源站点返回的通用无图资源。 */
+function isPlaceholderActorFace(url: string) {
+  return /nowprinting|no[-_]?image|no[-_]?photo|placeholder/i.test(url)
+}
+
+/** 从资料页生成 Tampermonkey 分区 Cookie 的顶级站点。 */
+function getCookiePartition(referer?: string) {
+  if (!referer)
+    return undefined
+  try {
+    const url = new URL(referer)
+    url.hostname = url.hostname.replace(/^www\./i, '')
+    return { topLevelSite: url.origin }
+  }
+  catch {
+    return undefined
+  }
+}
+
+/** 返回当前演员首选头像地址。 */
+function getActorImageSource(actor: ActorImageData, detailUrl?: string) {
+  return getActorImageCandidates(actor, detailUrl)[0]?.url || DEFAULT_AVATAR
+}
+
+/** 为演员头像建立跨来源 GM 加载链。 */
+function getActorLoader(actor: ActorImageData, detailUrl?: string) {
+  const candidates = getActorImageCandidates(actor, detailUrl)
+  return candidates.length
+    ? createGMImageFallbackLoader(candidates, {
+        transform: { maxHeight: 256, maxWidth: 256 },
+      })
+    : undefined
+}
+
+/** GM 链全部失败后用无 Referer 原生图片再试一次。 */
+function getActorFallback(actor: ActorImageData, detailUrl?: string) {
+  const urls = getActorImageCandidates(actor, detailUrl).map(candidate => candidate.url)
+  let index = 0
+  return () => h('img', {
+    alt: actor.name,
+    class: 'block size-full object-cover',
+    referrerpolicy: 'no-referrer',
+    src: urls[0] || DEFAULT_AVATAR,
+    onError: (event: Event) => {
+      const image = event.currentTarget as HTMLImageElement
+      index += 1
+      image.src = urls[index] || DEFAULT_AVATAR
+    },
+  })
+}
+
+interface PreviewImageData {
+  raw?: string
+  thumbnail?: string
+}
+
+/** 返回缩略图优先、原图后备的去重地址。 */
+function getPreviewUrls(item: PreviewImageData) {
+  return Array.from(new Set([item.thumbnail, item.raw].filter(Boolean))) as string[]
+}
+
+/** 合并当前来源和其他资料源中同序号的剧照候选。 */
+function getPreviewCandidates(item: PreviewImageData, index: number, referer?: string) {
+  const sources = [
+    { item, referer },
+    ...sourceTabs.value.flatMap((tab) => {
+      const info = tab.state.state.value
+      const preview = info?.preview?.[index]
+      return preview ? [{ item: preview, referer: info?.detailUrl }] : []
+    }),
+  ]
+  const usedUrls = new Set<string>()
+
+  return sources.flatMap(source => getPreviewUrls(source.item).flatMap((url) => {
+    if (!source.referer || usedUrls.has(url))
+      return []
+    usedUrls.add(url)
+    return [{
+      url,
+      referer: source.referer,
+      cookiePartition: getCookiePartition(source.referer),
+    }]
+  }))
+}
+
+/** 剧照依次尝试当前来源和其他资料源的同序号图片。 */
+function getPreviewLoader(item: PreviewImageData, index: number, referer?: string) {
+  const candidates = getPreviewCandidates(item, index, referer)
+  return candidates.length
+    ? createGMImageFallbackLoader(candidates, { timeoutMs: 3000, transform: false })
+    : undefined
+}
+
+/** GM 图片链失败后用无 Referer 原生图片逐项回退。 */
+function getPreviewFallback(
+  item: PreviewImageData,
+  index: number,
+  referer: string | undefined,
+  key: string,
+) {
+  const urls = getPreviewCandidates(item, index, referer).map(candidate => candidate.url)
+  let fallbackIndex = 0
+  return () => h('img', {
+    alt: '剧照',
+    class: 'block size-full object-cover',
+    referrerpolicy: 'no-referrer',
+    src: urls[0],
+    onError: (event: Event) => {
+      const image = event.currentTarget as HTMLImageElement
+      fallbackIndex += 1
+      if (urls[fallbackIndex]) {
+        image.src = urls[fallbackIndex]
+        return
+      }
+      hidePreview(key)
+    },
+  })
+}
+
+const failedPreviews = ref(new Set<string>())
+
+/** 为无缩略图的旧数据提供稳定的剧照键。 */
+function getPreviewKey(
+  item: PreviewImageData,
+  index: number,
+) {
+  return item.thumbnail || item.raw || String(index)
+}
+
+function hidePreview(key: string) {
+  /*
+   * ================================================================================
+   * 步骤2：移除加载失败的剧照
+   * ================================================================================
+   * 目标：图片失败后网格自动收缩，不保留错误文字和空白方块。
+   * 数据源：图片组件发送的失败事件。
+   * 操作：
+   * 1) 记录当前来源失败的剧照键
+   * 2) 触发网格重排
+   */
+  logger.info('开始移除加载失败的剧照', key)
+  failedPreviews.value = new Set([...failedPreviews.value, key])
+  logger.info('加载失败的剧照移除完成', key)
+}
+
 const movieInfo = computed(() => {
-  return props.movieInfos[activeSource.value]
+  return sourceTabs.value.find(tab => tab.key === activeSource.value)?.state
+    ?? sourceTabs.value[0]!.state
 })
+
+const previewSourceSignature = computed(() => JSON.stringify(sourceTabs.value.map((tab) => {
+  const info = tab.state.state.value
+  return [
+    tab.key,
+    info?.detailUrl,
+    info?.preview?.map(item => [item.thumbnail, item.raw]),
+  ]
+})))
+
+watch(
+  [activeSource, () => movieInfo.value.state.value?.detailUrl, previewSourceSignature],
+  () => {
+    failedPreviews.value = new Set()
+  },
+)
+
+watch(
+  () => sourceTabs.value.map(tab => tab.key).join(','),
+  () => {
+    /*
+     * ================================================================================
+     * 步骤1：同步播放器资料活动来源
+     * ================================================================================
+     * 目标：文件类型切换后默认展示当前可用的最高优先级来源。
+     * 数据源：普通来源和 FC2 专用来源标签。
+     * 操作：
+     * 1) 读取当前标签第一项
+     * 2) 更新活动来源，避免保留已移除标签
+     */
+    logger.info('开始同步播放器资料活动来源')
+
+    // 1.1 专用来源排在第一项；普通番号第一项仍是 JavDB。
+    activeSource.value = sourceTabs.value[0]?.key ?? 'javDBState'
+
+    logger.info('播放器资料活动来源同步完成', activeSource.value)
+  },
+  { immediate: true },
+)
 
 watch(movieInfoThumb, async () => {
   if (!movieInfoThumb.value)
@@ -330,7 +595,7 @@ watch(movieInfoThumb, async () => {
   lightbox.value = new PhotoSwipeLightbox({
     gallery: movieInfoThumb.value,
     children: 'a',
-    pswpModule: () => import('photoswipe'),
+    pswpModule: PhotoSwipe,
     mouseMovePan: true,
     initialZoomLevel: 'fit',
     wheelToZoom: true,

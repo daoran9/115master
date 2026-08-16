@@ -13,4 +13,7 @@ Hello world`)).toBe(`WEBVTT\n\n00:00:01.000 --> 00:00:04.000\nHello world\n\n`)
   expect(srtToVtt(`1
 No timecode here
 Hello world`)).toBe(`WEBVTT\n\n`)
+
+  expect(srtToVtt('1\r\n00:00:01,000 --> 00:00:04,000\r\nWindows subtitle\r\n'))
+    .toBe(`WEBVTT\n\n00:00:01.000 --> 00:00:04.000\nWindows subtitle\n\n`)
 })

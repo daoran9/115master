@@ -31,6 +31,8 @@ interface ButtonConfig {
  * FileItemMod 扩展菜单
  */
 export class FileItemModExtMenu extends FileItemModBase {
+  private readonly createdLinks: HTMLAnchorElement[] = []
+
   /** 按钮配置 */
   get buttonConfig(): ButtonConfig[] {
     return [
@@ -107,7 +109,10 @@ export class FileItemModExtMenu extends FileItemModBase {
   }
 
   /** 销毁 */
-  onDestroy() {}
+  onDestroy() {
+    this.createdLinks.forEach(link => link.remove())
+    this.createdLinks.length = 0
+  }
 
   /** 创建文件操作菜单按钮 */
   private createButtons(): void {
@@ -116,6 +121,7 @@ export class FileItemModExtMenu extends FileItemModBase {
         return
       const link = this.createNormalItemButtonElement(button)
       this.fileOprNode?.prepend(link)
+      this.createdLinks.push(link)
       link.addEventListener('mousedown', async (e: MouseEvent) => {
         e.preventDefault()
         e.stopPropagation()

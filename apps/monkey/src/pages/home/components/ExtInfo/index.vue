@@ -1,29 +1,37 @@
 <template>
   <div
-    ref="extInfoRef"
     :class="[
       styles.container.main,
-      props.variant === 'drive' ? styles.container.driveMain : styles.container.legacyMain,
+      props.variant === 'drive'
+        ? styles.container.driveMain
+        : props.variant === 'official'
+          ? extInfo.state.value
+            ? styles.container.officialMain
+            : styles.container.officialPending
+          : props.variant === 'official-panel'
+            ? styles.container.officialPanelMain
+            : styles.container.legacyMain,
     ]"
   >
     <div
+      v-if="props.variant !== 'official' || extInfo.state.value"
       :class="[
         styles.container.content,
         props.variant === 'drive' && styles.container.driveContent,
       ]"
     >
       <!-- 错误状态 -->
-      <div v-if="extInfo.error.value" :class="styles.states.error">
+      <div v-if="props.variant !== 'official' && extInfo.error.value" :class="styles.states.error">
         <LoadingError :message="extInfo.error.value" size="mini" />
       </div>
 
       <!-- 加载骨架 -->
-      <template v-else-if="extInfo.isLoading.value || (!extInfo.isLoading.value && !extInfo.isReady.value)">
+      <template v-else-if="props.variant !== 'official' && extInfo.isLoading.value">
         <div class="skeleton h-full w-full" />
       </template>
 
       <!-- 空状态 -->
-      <div v-else-if="!extInfo.state.value" :class="styles.states.empty">
+      <div v-else-if="props.variant !== 'official' && !extInfo.state.value" :class="styles.states.empty">
         <Empty :description="`未找到番号 [${props.avNumber}] 信息`" size="sm" />
       </div>
 
@@ -32,7 +40,7 @@
         <div :class="[styles.cover.container, props.variant === 'drive' && styles.cover.drive]">
           <a href="javascript:void(0)" :alt="extInfo.state.value?.title" :class="styles.cover.link">
             <Image
-              :src="extInfo.state.value?.cover?.url ?? ''"
+              :src="coverCandidates[0]?.url ?? ''"
               :alt="extInfo.state.value?.title ?? ''"
               :loader="coverLoader"
               class="size-full"
@@ -152,28 +160,25 @@
 
 <script setup lang="ts">
 import { format } from '@115master/utils'
-import { useAsyncState, useElementVisibility } from '@vueuse/core'
-import { computed, ref, watch } from 'vue'
+import { useAsyncState } from '@vueuse/core'
+import { computed } from 'vue'
 import {
   Empty,
   Image,
   LoadingError,
 } from '@/components'
 import { clsx } from '@/utils/clsx'
-import { createGMImageLoader } from '@/utils/imageLoader'
-import { Jav, JavBus, JavDB } from '@/utils/jav'
-import { MissAV } from '@/utils/jav/missAV'
+import { createGMImageFallbackLoader } from '@/utils/imageLoader'
+import { createJavInfoSources } from '@/utils/jav'
+import { loadJavInfo } from '@/utils/jav/loadInfo'
 import { appLogger } from '@/utils/logger'
 
 const props = withDefaults(defineProps<{
   avNumber: string
-  variant?: 'drive' | 'legacy'
+  variant?: 'drive' | 'legacy' | 'official' | 'official-panel'
 }>(), {
   variant: 'legacy',
 })
-const javBus = new JavBus()
-const javDB = new JavDB()
-const missAV = new MissAV()
 const logger = appLogger.sub('ExtInfo')
 
 /** 样式常量定义 */
@@ -183,6 +188,9 @@ const styles = clsx({
     main: 'w-full',
     legacyMain: 'h-24 px-20',
     driveMain: 'min-h-20 px-3 pt-2 pb-3',
+    officialMain: 'min-h-24 px-4 py-2',
+    officialPanelMain: 'min-h-24 px-4 py-2',
+    officialPending: 'h-px overflow-hidden',
     content: 'group relative flex h-full items-center gap-1',
     driveContent: 'flex-col items-stretch gap-2',
   },
@@ -230,11 +238,6 @@ const styles = clsx({
   },
 })
 
-const extInfoRef = ref<HTMLElement>()
-const extInfoRefVisible = useElementVisibility(extInfoRef, {
-  once: true,
-})
-
 const extInfo = useAsyncState(
   async () => {
     /**
@@ -243,33 +246,17 @@ const extInfo = useAsyncState(
      * ================================================================================
      * 目标：复用旧版多来源能力，并避免可见列表重复请求。
      * 操作：
-     * 1) 先读取 JavBus、JavDB、MissAV 缓存
-     * 2) 缓存未命中时按来源顺序请求
+     * 1) 普通番号保留 JavLibrary、JavBus、JavDB、MissAV 顺序
+     * 2) FC2 在普通来源前增加 FD2PPV
      */
     logger.info('开始加载番号资料', props.avNumber)
 
     try {
-      const javs = [javBus, javDB, missAV]
-      for (const jav of javs) {
-        const info = await jav.getInfoByCache(props.avNumber)
-        if (info) {
-          return info
-        }
-      }
-
-      for (const [index, jav] of Object.entries(javs)) {
-        try {
-          return await jav.getInfo(props.avNumber)
-        }
-        catch (error) {
-          if (Number(index) === javs.length - 1) {
-            if (error instanceof Jav.NotFound) {
-              return null
-            }
-            throw error
-          }
-        }
-      }
+      // 1.1 缓存并行读取；联网请求重叠等待但仍按数组顺序选取结果。
+      return await loadJavInfo(
+        props.avNumber,
+        createJavInfoSources(props.avNumber),
+      )
     }
     finally {
       logger.info('番号资料加载完成', props.avNumber)
@@ -277,20 +264,43 @@ const extInfo = useAsyncState(
   },
   null,
   {
-    immediate: false,
+    immediate: true,
   },
 )
 
-const coverLoader = computed(() => {
-  const referer = extInfo.state.value?.cover?.referer
-  if (!referer)
-    return undefined
-  return createGMImageLoader({ referer })
+const coverCandidates = computed(() => {
+  /*
+   * ================================================================================
+   * 步骤1：整理详情封面候选
+   * ================================================================================
+   * 目标：按资料源优先级向图片加载器提供全部可用封面。
+   * 数据源：融合详情主封面、单页封面和后备来源封面。
+   * 操作：
+   * 1) 展开候选并过滤空值
+   * 2) 按 URL 和 Referer 去重
+   */
+  logger.info('开始整理详情封面候选', props.avNumber)
+
+  const info = extInfo.state.value
+  const seen = new Set<string>()
+  const candidates = [info?.cover, info?.coverSingle, ...(info?.coverFallbacks ?? [])]
+    .filter((cover): cover is NonNullable<typeof cover> => Boolean(cover?.url))
+    .filter((cover) => {
+      /** 1.1 同 URL 的不同 Referer 仍可作为独立防盗链尝试。 */
+      const key = `${cover.url}\u0000${cover.referer ?? ''}`
+      if (seen.has(key))
+        return false
+      seen.add(key)
+      return true
+    })
+
+  logger.info('详情封面候选整理完成', props.avNumber, candidates.length)
+  return candidates
 })
 
-watch(extInfoRefVisible, (visible) => {
-  if (visible) {
-    extInfo.execute(0)
-  }
+const coverLoader = computed(() => {
+  if (!coverCandidates.value.length)
+    return undefined
+  return createGMImageFallbackLoader(coverCandidates.value)
 })
 </script>

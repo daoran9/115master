@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { HOME_URL, setupHarness } from '../../support'
-import { gmStore, watch } from '../../support/homeUtils'
+import { gmStore, replaceList, watch } from '../../support/homeUtils'
 
 /**
  * userSettings 开关：enableFilelistPreview 绑定 FileItemModVideoCover
@@ -18,7 +18,41 @@ test.describe('userSettings 开关', () => {
     await expect(page.locator('a.master-player')).toHaveCount(40)
     await expect(page.locator('li.with-ext-video-cover')).toHaveCount(0)
     await expect(page.locator('.ext-video-cover-root')).toHaveCount(0)
-    await expect(page.locator('a.master-preview-switch-btn')).not.toHaveClass(/active/)
+    const preview = page.locator('a.master-preview-switch-btn')
+    await expect(preview).not.toHaveClass(/active/)
+    await expect(preview).toHaveAttribute('title', '开启文件预览')
+    await expect(preview).toHaveAttribute('aria-pressed', 'false')
+
+    /** 关闭预览不影响番号详情。 */
+    await replaceList(page, [
+      { title: 'SORA-636.mp4', iv: '1', file_type: '1', pick_code: 'soraPick', sha1: 'SORA' },
+    ])
+    const sora = page.locator('li[pick_code="soraPick"]')
+    await expect(sora.locator('.ext-info-root')).toBeAttached()
+    await expect(sora.locator('.ext-video-cover-root')).toHaveCount(0)
+    expect(errors).toEqual([])
+  })
+
+  test('enableAvInfo=false：关闭详情不影响视频预览', async ({ page }) => {
+    const errors = watch(page)
+    await setupHarness(page, {
+      gmValues: {
+        USER_SETTINGS: {
+          enableAvInfo: false,
+          enableFilelistPreview: true,
+          theme: 'system',
+        },
+      },
+    })
+    await page.goto(HOME_URL)
+
+    /** 关闭番号详情后，带番号的视频仍加载预览。 */
+    await replaceList(page, [
+      { title: 'SORA-636.mp4', iv: '1', file_type: '1', pick_code: 'soraPick', sha1: 'SORA' },
+    ])
+    const sora = page.locator('li[pick_code="soraPick"]')
+    await expect(sora.locator('.ext-info-root')).toHaveCount(0)
+    await expect(sora.locator('.ext-video-cover-root')).toBeAttached()
     expect(errors).toEqual([])
   })
 
@@ -35,6 +69,8 @@ test.describe('userSettings 开关', () => {
     // 关闭预览：设置持久化、开关去 active、封面挂载点完整移除。
     await preview.click()
     await expect(preview).not.toHaveClass(/active/)
+    await expect(preview).toHaveAttribute('title', '开启文件预览')
+    await expect(preview).toHaveAttribute('aria-pressed', 'false')
     await expect.poll(async () => {
       const store = await gmStore(page)
       return (store.USER_SETTINGS as { enableFilelistPreview?: boolean } | undefined)?.enableFilelistPreview
@@ -44,6 +80,8 @@ test.describe('userSettings 开关', () => {
     // 重新开启：设置持久化、开关 active、封面重新挂载出内容
     await preview.click()
     await expect(preview).toHaveClass(/active/)
+    await expect(preview).toHaveAttribute('title', '关闭文件预览')
+    await expect(preview).toHaveAttribute('aria-pressed', 'true')
     await expect.poll(async () => {
       const store = await gmStore(page)
       return (store.USER_SETTINGS as { enableFilelistPreview?: boolean } | undefined)?.enableFilelistPreview

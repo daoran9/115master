@@ -7,6 +7,8 @@ export enum FileType {
 
 /** 是否视频 */
 export enum IvType {
+  // 否
+  No = '0',
   // 是
   Yes = '1',
 }
@@ -50,6 +52,8 @@ export interface FileItemAttributes {
   sha1: string
   /** 文件大小 */
   file_size?: string
+  /** 115Browser 文件夹下载使用的快捷码 */
+  download_sc?: string
   /** 播放按钮 */
   play_button: string
 }
@@ -60,6 +64,12 @@ export interface ItemInfo {
   fileListType: FileListType
   duration: number
   listScrollBoxNode: Element
+  /** 当前文件行来自旧版首页或新版官方页面。 */
+  surface?: 'legacy' | 'official'
+  /** 新版官方页面以内联行或独立面板承载增强内容。 */
+  presentation?: 'inline' | 'panel'
+  /** 新版官方页面的原生文件行，只用于读取文件名和绑定安全交互。 */
+  interactionNode?: HTMLElement
 }
 
 /**

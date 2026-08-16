@@ -2,9 +2,9 @@ import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import { boot, menu, row, rows, watch } from './helpers'
 
-/** 勾选某行的复选框 */
+/** 默认态用 Ctrl+单击进入多选，符合桌面端真实交互。 */
 async function check(page: Page, name: string) {
-  await row(page, name).locator('input[type="checkbox"]').click()
+  await row(page, name).click({ modifiers: ['Control'] })
 }
 
 test.describe('选择与操作', () => {
@@ -122,12 +122,12 @@ test.describe('选择与操作', () => {
     expect(errors).toEqual([])
   })
 
-  test('全选：Meta+A 选中当前页全部', async ({ page }) => {
+  test('全选：Ctrl+A 选中当前页全部', async ({ page }) => {
     const errors = watch(page)
     await boot(page)
 
     await check(page, '演示视频 01.mp4')
-    await page.keyboard.press('Meta+a')
+    await page.keyboard.press('Control+a')
     await expect(page.getByTitle('退出多选')).toContainText('43 项')
 
     expect(errors).toEqual([])

@@ -13,6 +13,12 @@ export type RequestOptions = RequestInit & {
   cacheKey?: string
   cacheStatus?: number[]
   data?: unknown
+  /** Tampermonkey: merge this value into the browser cookie set. */
+  cookie?: string
+  /** Tampermonkey: select the partitioned cookie jar used by the request. */
+  cookiePartition?: {
+    topLevelSite?: string
+  }
 }
 
 export type ResponseType = Response

@@ -25,6 +25,9 @@ const dev = !isProd ? devConfig(env.BRANCH_PORT) : undefined
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  define: {
+    __115MASTER_VERSION__: JSON.stringify(PKG.version),
+  },
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
@@ -32,6 +35,12 @@ export default defineConfig({
   },
   build: {
     minify: true,
+    rollupOptions: {
+      output: {
+        // Keep userscript modules inline so SystemJS cannot resolve them against 115's Next.js base URL.
+        inlineDynamicImports: true,
+      },
+    },
   },
   optimizeDeps: {
     exclude: ['@libmedia/avplayer'],
@@ -76,9 +85,14 @@ export default defineConfig({
         'description': PKG.description,
         'supportURL': PKG.bugs?.url,
         'run-at': 'document-start',
+        'grant': [
+          'GM_addValueChangeListener',
+          'GM_deleteValue',
+        ],
         'include': [
           'https://115.com/*',
           'https://dl.115cdn.net/video/token',
+          'https://www.javlibrary.com/*',
         ],
         'exclude': [
           'https://*.115.com/bridge*',
@@ -100,10 +114,26 @@ export default defineConfig({
           '*.oss-cn-shenzhen.aliyuncs.com',
           'v.anxia.com',
           'subtitlecat.com',
+          'avsubtitles.com',
+          'www.avsubtitles.com',
+          'aiyi1.com',
+          'www.aiyi1.com',
           'javbus.com',
           'javdb.com',
+          'javlibrary.com',
           'jdbstatic.com',
+          'c0.jdbstatic.com',
+          '*.jdbstatic.com',
+          'pics.dmm.co.jp',
+          'pics.dmm.com',
+          'imgsrc.dmm.com',
           'missav.ws',
+          'fourhoi.com',
+          '*.fourhoi.com',
+          'fd2ppv.cc',
+          '*.contents.fc2.com',
+          'contents-thumbnail2.fc2.com',
+          'xximgs.cc',
           'api-shoulei-ssl.xunlei.com',
           'subtitle.v.geilijiasu.com',
         ],

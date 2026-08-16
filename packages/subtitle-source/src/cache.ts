@@ -11,4 +11,8 @@ export interface ProcessedSubtitle {
   comment: 1 | -1 | 0
   originLanguage: string
   targetLanguage: string
+  /** 字幕来源。 */
+  source?: string
+  /** 已核对的标准番号。 */
+  avNumber?: string
 }

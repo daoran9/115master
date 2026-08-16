@@ -1,10 +1,15 @@
 import { javCache } from '@/utils/cache/javCache'
+import { appLogger } from '@/utils/logger'
 import { GMRequest } from '@/utils/request/gmRequest'
+
+const logger = appLogger.sub('Jav')
 
 /** 来源 */
 export enum JAV_SOURCE {
+  FD2PPV = 'FD2PPV',
   JAVBUS = 'JavBus',
   JAVDB = 'JavDB',
+  JAVLIBRARY = 'JavLibrary',
   MISSAV = 'MissAV',
 }
 
@@ -26,6 +31,8 @@ interface Actor {
   sex?: 0 | 1
   /** face */
   face?: string
+  /** 头像防盗链来源页 */
+  faceReferer?: string
 }
 
 /** 类别 */
@@ -120,6 +127,8 @@ export interface JavInfo {
   cover?: Cover
   /** 封面（单页） */
   coverSingle?: Cover
+  /** 低优先级来源和同源单页封面候选 */
+  coverFallbacks?: Cover[]
   /** 预览图 */
   preview?: Preview[]
   /** 系列 */
@@ -136,6 +145,48 @@ export interface JavInfo {
   downloadCount?: number
   /** 评论 */
   comments?: Comment[]
+}
+
+/** 把番号统一为只含大写字母和数字的比较键。 */
+export function normalizeAvNumber(avNumber?: string | null): string {
+  return avNumber
+    ?.normalize('NFKC')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '') ?? ''
+}
+
+/** 判断两个番号是否仅存在大小写或分隔符差异。 */
+export function isSameAvNumber(
+  expectedAvNumber?: string | null,
+  actualAvNumber?: string | null,
+): boolean {
+  const expected = normalizeAvNumber(expectedAvNumber)
+  return Boolean(expected && expected === normalizeAvNumber(actualAvNumber))
+}
+
+/** 判断资料是否属于当前查询番号。 */
+export function isJavInfoForAvNumber(
+  avNumber: string,
+  info?: JavInfo | null,
+): boolean {
+  return Boolean(
+    info?.avNumber
+    && isSameAvNumber(avNumber, info.avNumber),
+  )
+}
+
+/** 只有具备列表详情核心字段且番号一致的数据才写入长期缓存。 */
+export function isJavInfoCacheable(
+  info?: JavInfo | null,
+  avNumber?: string,
+): info is JavInfo {
+  return Boolean(
+    info?.avNumber?.trim()
+    && info.title?.trim()
+    && (info.cover?.url || info.coverSingle?.url)
+    && (!avNumber || isJavInfoForAvNumber(avNumber, info)),
+  )
 }
 
 /** 未找到番号 */
@@ -173,24 +224,67 @@ abstract class Jav {
 
   /** 获取番号信息 */
   async getInfo(avNumber: string): Promise<JavInfo | undefined> {
+    /*
+     * ================================================================================
+     * 步骤1：读取并核对单源缓存
+     * ================================================================================
+     * 目标：只复用当前番号的完整资料，旧错误缓存不能继续污染页面。
+     * 数据源：以来源和请求番号组成的 IndexedDB 缓存。
+     * 操作：
+     * 1) 读取缓存并复核返回番号
+     * 2) 完整缓存直接返回；不完整缓存继续联网刷新
+     */
+    logger.info('开始读取单源番号资料', this.source, avNumber)
     const info = await this.getInfoByCache(avNumber)
-    if (info) {
+    if (isJavInfoCacheable(info, avNumber)) {
+      logger.info('单源番号资料读取完成，命中完整缓存', this.source, avNumber)
       return info
     }
+
+    logger.info('单源番号资料缓存读取完成，开始联网刷新', this.source, avNumber)
+
+    /*
+     * ================================================================================
+     * 步骤2：请求并复核网络资料
+     * ================================================================================
+     * 目标：禁止相似番号响应写入当前番号缓存。
+     * 数据源：当前 Jav 资料源的搜索页或详情页。
+     * 操作：
+     * 1) 请求并解析详情
+     * 2) 核对番号后按完整度决定是否缓存
+     */
+    logger.info('开始请求单源番号资料', this.source, avNumber)
     const infoNew = await this.getInfoByAvNumber(avNumber)
-    if (infoNew) {
-      this.cache.set(`${this.source}:${avNumber}`, infoNew)
+    if (!isJavInfoForAvNumber(avNumber, infoNew)) {
+      if (infoNew?.avNumber) {
+        logger.warn('单源番号不一致，忽略资料', this.source, avNumber, infoNew.avNumber)
+      }
+      logger.info('单源番号资料请求完成，无精确结果', this.source, avNumber)
+      return info
     }
-    return infoNew ?? undefined
+    if (isJavInfoCacheable(infoNew, avNumber)) {
+      await this.cache.set(`${this.source}:${avNumber}`, infoNew)
+    }
+    logger.info('单源番号资料请求完成', this.source, avNumber)
+    return infoNew
   }
 
   /** 获取番号信息缓存 */
   async getInfoByCache(avNumber: string): Promise<JavInfo | undefined> {
     const info = await this.cache.get(`${this.source}:${avNumber}`)
-    if (info) {
-      return info.value
+    if (!info) {
+      return undefined
     }
-    return undefined
+    if (!isJavInfoForAvNumber(avNumber, info.value)) {
+      logger.warn(
+        '单源番号缓存不一致，忽略缓存',
+        this.source,
+        avNumber,
+        info.value.avNumber,
+      )
+      return undefined
+    }
+    return info.value
   }
 
   /** 解析番号信息 */

@@ -24,6 +24,7 @@ interface TestProps {
   lazy?: boolean
   class?: string
   style?: string
+  onError?: () => void
 }
 
 function mount(values: TestProps) {
@@ -37,6 +38,7 @@ function mount(values: TestProps) {
       lazy: props.lazy,
       class: props.class,
       style: props.style,
+      onError: props.onError,
     }),
   })
   app.mount(host)
@@ -219,6 +221,34 @@ describe('image', () => {
 
     expect(view.host.firstElementChild?.getAttribute('role')).toBe('img')
     expect(view.host.firstElementChild?.getAttribute('aria-label')).toBe('影片封面加载失败')
+    expect(view.host.firstElementChild?.getAttribute('data-115master-image-error')).toBe('broken')
+  })
+
+  it('notifies the parent when the loader cannot provide an image', async () => {
+    const onError = vi.fn()
+    const loader: ImageLoader = {
+      key: 'error-event',
+      load: vi.fn(async () => { throw new Error('broken') }),
+    }
+
+    /*
+     * ================================================================================
+     * 步骤1：验证图片错误事件
+     * ================================================================================
+     * 目标：父级网格能在远程图片失败后移除对应项目。
+     * 数据源：主动失败的图片加载器。
+     * 操作：
+     * 1) 挂载带错误监听器的图片
+     * 2) 核对父级只收到一次错误事件
+     */
+    console.info('[unit] 开始验证图片错误事件')
+
+    const view = mount({ src: 'broken', loader, onError })
+    await flush()
+
+    expect(view.host.querySelector('[data-loading-error]')).not.toBeNull()
+    expect(onError).toHaveBeenCalledOnce()
+    console.info('[unit] 图片错误事件验证完成')
   })
 
   it('disposes loader resources when the source changes and on unmount', async () => {

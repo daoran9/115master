@@ -2,56 +2,127 @@ import type { ProcessedSubtitle } from '@115master/subtitle-source'
 import type { Subtitle } from '@/components/XPlayer/types'
 import { FetchRequest } from '@115master/shared'
 import { subtitleSource } from '@115master/subtitle-source'
-import { array, string } from '@115master/utils'
+import { string } from '@115master/utils'
 import { useAsyncState } from '@vueuse/core'
 import { shallowRef } from 'vue'
 import { subtitleCache } from '@/utils/cache/subtitleCache'
 import { subtitlePreference } from '@/utils/cache/subtitlePreference'
 import { drive115 } from '@/utils/drive115Instance'
+import { getAvNumber } from '@/utils/getNumber'
+import { appLogger } from '@/utils/logger'
 import { GMRequestInstance } from '@/utils/request/gmRequest'
+import { rankSubtitlesByRelevance } from './subtitleRanking'
+
+/* eslint-disable jsdoc/convert-to-jsdoc-comments */
 
 const fetchRequest = new FetchRequest()
+const logger = appLogger.sub('SubtitlesData')
 
 const subtitlecat = new subtitleSource.SubtitleCat({
   request: GMRequestInstance,
+  extractAvNumber: getAvNumber,
 })
 
 const thunder = new subtitleSource.Thunder({
   request: GMRequestInstance,
+  extractAvNumber: getAvNumber,
+})
+
+const avsubtitles = new subtitleSource.AvSubtitles({
+  request: GMRequestInstance,
+  extractAvNumber: getAvNumber,
+})
+
+const aiyi = new subtitleSource.Aiyi({
+  request: GMRequestInstance,
+  extractAvNumber: getAvNumber,
 })
 
 /** 字幕数据 */
 export function useDataSubtitles() {
   const currentId = shallowRef<string>()
 
-  const toSubtitle = (subtitle: ProcessedSubtitle): Subtitle => ({
+  const toSubtitle = (
+    subtitle: ProcessedSubtitle,
+    source = subtitle.source ?? 'Subtitle Cat',
+  ): Subtitle => ({
     id: subtitle.id,
     label: subtitle.title,
     srclang: subtitle.targetLanguage,
-    source: 'Subtitle Cat',
+    source,
     raw: subtitle.raw,
     format: subtitle.format,
     kind: 'subtitles' as const,
+    avNumber: subtitle.avNumber,
+    sourceScore: subtitle.comment * 100 + Math.log10(subtitle.downloads + 1),
   })
+
+  const getCached = async (
+    source: string,
+    keyword: string,
+    fetcher: () => Promise<ProcessedSubtitle[]>,
+  ): Promise<Subtitle[]> => {
+    /*
+     * ================================================================================
+     * 步骤1：读取外部字幕来源
+     * ================================================================================
+     * 目标：按来源隔离缓存，避免同一番号在多个站点互相覆盖。
+     * 数据源：来源名、标准番号和来源客户端。
+     * 操作：
+     * 1) 优先读取七天缓存
+     * 2) 联网成功后缓存完整可播放字幕
+     */
+    logger.info('开始读取外部字幕来源', source, keyword)
+
+    // 1.1 缓存键包含来源名，保留各站独立结果。
+    const key = `${source}:${keyword}`
+    const cached = await subtitleCache.getCache(key, 'zh-CN')
+    if (cached) {
+      const result = cached.map(subtitle => toSubtitle(subtitle, source))
+      logger.info('外部字幕来源读取完成，命中缓存', source, result.length)
+      return result
+    }
+
+    // 1.2 只缓存已经下载并能交给播放器的结果。
+    const subtitles = await fetcher()
+    if (subtitles.length > 0)
+      await subtitleCache.addCache(key, 'zh-CN', subtitles.map(subtitle => ({ ...subtitle })))
+    const result = subtitles.map(subtitle => toSubtitle(subtitle, source))
+    logger.info('外部字幕来源读取完成', source, result.length)
+    return result
+  }
 
   /** 通过 subtitleCat 获取字幕 */
   const getFromSubtitlecat = async (keyword: string): Promise<Subtitle[]> => {
     if (!keyword)
       return []
+    return getCached(
+      'Subtitle Cat',
+      keyword,
+      () => subtitlecat.fetchSubtitle(keyword, 'zh-CN'),
+    )
+  }
 
-    const cached = await subtitleCache.getCache(keyword, 'zh-CN')
-    if (cached) {
-      return cached.map(toSubtitle)
-    }
+  /** 通过 AVSubtitles 获取精确番号字幕。 */
+  const getFromAvSubtitles = async (keyword: string): Promise<Subtitle[]> => {
+    if (!keyword)
+      return []
+    return getCached(
+      'AVSubtitles',
+      keyword,
+      () => avsubtitles.fetchSubtitle(keyword, 'zh-CN'),
+    )
+  }
 
-    const res = await subtitlecat.fetchSubtitle(keyword, 'zh-CN')
-    const subtitles = res.map(toSubtitle)
-
-    if (subtitles.length > 0) {
-      await subtitleCache.addCache(keyword, 'zh-CN', res.map(i => ({ ...i })))
-    }
-
-    return subtitles
+  /** 通过爱译网获取精确番号字幕。 */
+  const getFromAiyi = async (keyword: string): Promise<Subtitle[]> => {
+    if (!keyword)
+      return []
+    return getCached(
+      '爱译网',
+      keyword,
+      () => aiyi.fetchSubtitle(keyword, 'zh-CN'),
+    )
   }
 
   /** 通过迅雷获取字幕 */
@@ -68,6 +139,10 @@ export function useDataSubtitles() {
       raw: subtitle.raw,
       format: subtitle.format,
       kind: 'subtitles' as const,
+      durationMs: subtitle.durationMs,
+      sourceScore: subtitle.score,
+      fingerprintScore: subtitle.fingerprintScore,
+      avNumber: subtitle.avNumber,
     } satisfies Subtitle))
     return subtitles
   }
@@ -92,6 +167,7 @@ export function useDataSubtitles() {
           srclang: subtitle.language || 'zh-CN',
           format: subtitle.type,
           kind: 'subtitles' as const,
+          trustedForVideo: true,
         } satisfies Subtitle
       }),
     )
@@ -100,14 +176,14 @@ export function useDataSubtitles() {
       .map(result => (result as PromiseFulfilledResult<Subtitle>).value)
   }
 
-  /** 计算相似度 */
-  const computedSimilarity = (a: string, b: string) => {
-    return array.jaccardSimilarity(string.splitWords(a), string.splitWords(b))
-  }
-
   /** 字幕数据 */
   const subtitles = useAsyncState<Subtitle[]>(
-    async (pickcode: string, filename: string, keyword: string): Promise<Subtitle[]> => {
+    async (
+      pickcode: string,
+      filename: string,
+      keyword: string,
+      videoDurationSeconds?: number,
+    ): Promise<Subtitle[]> => {
       currentId.value = pickcode
       const preference = await subtitlePreference.getPreference(pickcode)
       if (currentId.value !== pickcode) {
@@ -117,6 +193,8 @@ export function useDataSubtitles() {
       const results = await Promise.allSettled([
         getFromSubtitlecat(keyword),
         getFromThunder(filename),
+        getFromAvSubtitles(keyword),
+        getFromAiyi(keyword),
         getFrom115(pickcode),
       ])
 
@@ -128,17 +206,18 @@ export function useDataSubtitles() {
         .filter(result => result.status === 'fulfilled')
         .map(result => (result as PromiseFulfilledResult<Subtitle[]>).value)
         .flat()
-        .map(subtitle => ({
-          ...subtitle,
-          similarity: computedSimilarity(subtitle.label, filename),
-        }))
-        .sort((a, b) => b.similarity - a.similarity)
+      const rankedSubtitles = rankSubtitlesByRelevance(
+        subtitles,
+        filename,
+        keyword,
+        videoDurationSeconds,
+      )
+
+      return rankedSubtitles
         .map(subtitle => ({
           ...subtitle,
           default: preference ? preference.id === subtitle.id : false,
         }))
-
-      return subtitles
     },
     [],
     {

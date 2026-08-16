@@ -4,8 +4,14 @@ import { createApp } from 'vue'
 import ExtInfo from '@/pages/home/components/ExtInfo/index.vue'
 import { FileListType, FileType, IvType } from '@/pages/home/types'
 import mainStyles from '@/styles/main.css?inline'
+import { adoptShadowStyle } from '@/utils/adoptShadowStyle'
 import { appLogger } from '@/utils/logger'
 import { FileItemModBase } from './base'
+import {
+  FILE_ITEM_PRELOAD_MARGIN,
+  isWithinFileItemPreloadRange,
+  watchFileItemPreloadRange,
+} from './preloadRange'
 
 /** 番号资料增强共用日志。 */
 const logger = appLogger.sub('FileItemModExtInfo')
@@ -18,25 +24,30 @@ export class FileItemModExtInfo extends FileItemModBase {
 
   private container: HTMLDivElement | null = null
   private vueApp: App | null = null
+  private visibilityObserver: IntersectionObserver | null = null
+  private stopPreloadWatch: (() => void) | null = null
 
   onLoad() {
-    logger.info('开始加载旧版页面番号资料')
+    const avNumber = this.itemInfo.avNumber
 
     // 如果文件列表类型为网格，则不加载扩展信息
     if (this.itemInfo.fileListType === FileListType.grid) {
       return
     }
 
-    // 如果视频不可播放且不是文件夹，则不加载扩展信息
+    // 只有带常见视频扩展名的可播放文件才加载详情。
     if (
       this.itemInfo.attributes.iv !== IvType.Yes
-      && this.itemInfo.attributes.file_type !== FileType.folder
+      || this.itemInfo.attributes.file_type !== FileType.file
+      || !/\.(?:3gp|avi|flv|m2ts|m4v|mkv|mov|mp4|mpeg|mpg|rm|rmvb|ts|vob|webm|wmv)$/i.test(
+        this.itemInfo.attributes.title,
+      )
     ) {
       return
     }
 
     // 如果视频没有番号，则不加载扩展信息
-    if (!this.itemInfo.avNumber) {
+    if (!avNumber) {
       return
     }
 
@@ -45,35 +56,77 @@ export class FileItemModExtInfo extends FileItemModBase {
     /** 创建容器元素 */
     const extInfoContainer = document.createElement('div')
     extInfoContainer.style.width = '100%'
+    extInfoContainer.style.minHeight = this.itemInfo.surface === 'official'
+      && this.itemInfo.presentation !== 'panel'
+      ? '1px'
+      : '96px'
+    extInfoContainer.setAttribute('data-115master-detail', '')
+    extInfoContainer.setAttribute('data-115master-av-number', avNumber)
     this.itemNode.append(extInfoContainer)
     this.container = extInfoContainer
 
-    /** 创建 shadow DOM */
-    const shadowRoot = extInfoContainer.attachShadow({ mode: 'open' })
+    /*
+     * ================================================================================
+     * 步骤1：延迟挂载视口外详情组件
+     * ================================================================================
+     * 目标：大目录只创建视口附近的 Vue 与 Shadow DOM，减少首屏阻塞。
+     * 数据源：文件列表滚动容器和详情占位节点。
+     * 操作：
+     * 1) 提前 600px 观察即将进入视口的详情
+     * 2) 命中后只挂载一次
+     */
+    logger.info('开始监听番号详情可见区域', avNumber)
+    const ownerWindow = extInfoContainer.ownerDocument.defaultView
+    const Observer = ownerWindow?.IntersectionObserver
+    if (!Observer) {
+      this.mountApp(avNumber)
+      logger.info('番号详情可见区域监听完成，使用即时挂载', avNumber)
+      return
+    }
 
-    /** 在 shadow DOM 中添加样式 */
-    const styleElement = document.createElement('style')
-    styleElement.textContent = mainStyles
-    shadowRoot.appendChild(styleElement)
+    const scrollBox = this.itemInfo.listScrollBoxNode
+    if (isWithinFileItemPreloadRange(extInfoContainer, scrollBox)) {
+      this.mountApp(avNumber)
+      logger.info('番号详情可见区域监听完成，使用坐标即时挂载', avNumber)
+      return
+    }
 
-    /** 在 shadow DOM 中创建挂载点，data-theme 跟随应用当前主题 */
-    const extInfoDom = document.createElement('div')
-    extInfoDom.className = 'ext-info-root'
-    const appRoot = document.getElementById('my-app')
-    extInfoDom.setAttribute('data-theme', appRoot?.getAttribute('data-theme') || 'dark')
-    shadowRoot.appendChild(extInfoDom)
-
-    /** 创建并挂载 Vue 应用 */
-    const app = createApp(ExtInfo, {
-      avNumber: this.itemInfo.avNumber,
+    const root = scrollBox instanceof Element && scrollBox.contains(extInfoContainer)
+      ? scrollBox
+      : null
+    this.visibilityObserver = new Observer((entries) => {
+      if (!entries.some(entry => entry.isIntersecting))
+        return
+      this.visibilityObserver?.disconnect()
+      this.visibilityObserver = null
+      this.stopPreloadWatch?.()
+      this.stopPreloadWatch = null
+      this.mountApp(avNumber)
+    }, {
+      root,
+      rootMargin: `${FILE_ITEM_PRELOAD_MARGIN}px 0px`,
     })
-    app.mount(extInfoDom)
-    this.vueApp = app
-    logger.info('旧版页面番号资料加载完成')
+    this.visibilityObserver.observe(extInfoContainer)
+    this.stopPreloadWatch = watchFileItemPreloadRange(
+      extInfoContainer,
+      scrollBox,
+      () => {
+        this.visibilityObserver?.disconnect()
+        this.visibilityObserver = null
+        this.stopPreloadWatch?.()
+        this.stopPreloadWatch = null
+        this.mountApp(avNumber)
+      },
+    )
+    logger.info('番号详情可见区域监听完成', avNumber)
   }
 
   onDestroy() {
     logger.info('开始卸载旧版页面番号资料')
+    this.visibilityObserver?.disconnect()
+    this.visibilityObserver = null
+    this.stopPreloadWatch?.()
+    this.stopPreloadWatch = null
     const app = this.vueApp
     this.vueApp = null
 
@@ -85,5 +138,51 @@ export class FileItemModExtInfo extends FileItemModBase {
     this.container = null
     this.itemNode.classList.remove('with-ext-info')
     logger.info('旧版页面番号资料卸载完成')
+  }
+
+  private mountApp(avNumber: string) {
+    if (this.vueApp || !this.container?.isConnected)
+      return
+
+    /*
+     * ================================================================================
+     * 步骤2：挂载可见番号详情
+     * ================================================================================
+     * 目标：复用共享样式表，并在进入预加载范围后启动资料请求。
+     * 数据源：当前详情容器和番号。
+     * 操作：
+     * 1) 创建 Shadow DOM 并采用共享样式
+     * 2) 挂载 Vue 详情组件
+     */
+    logger.info('开始挂载可见番号详情', avNumber)
+
+    /** 创建 shadow DOM */
+    const shadowRoot = this.container.attachShadow({ mode: 'open' })
+
+    /** 在 shadow DOM 中采用文档级共享样式 */
+    adoptShadowStyle(shadowRoot, mainStyles)
+
+    /** 在 shadow DOM 中创建挂载点，data-theme 跟随应用当前主题 */
+    const extInfoDom = this.container.ownerDocument.createElement('div')
+    extInfoDom.className = 'ext-info-root'
+    const appRoot = this.container.ownerDocument.getElementById('my-app')
+    const theme = this.itemInfo.surface === 'official'
+      ? 'light'
+      : appRoot?.getAttribute('data-theme') || 'dark'
+    extInfoDom.setAttribute('data-theme', theme)
+    shadowRoot.appendChild(extInfoDom)
+
+    /** 创建并挂载 Vue 应用 */
+    const app = createApp(ExtInfo, {
+      avNumber,
+      variant: this.itemInfo.surface === 'official'
+        ? this.itemInfo.presentation === 'panel'
+          ? 'official-panel'
+          : 'official'
+        : 'legacy',
+    })
+    app.mount(extInfoDom)
+    this.vueApp = app
+    logger.info('可见番号详情挂载完成', avNumber)
   }
 }

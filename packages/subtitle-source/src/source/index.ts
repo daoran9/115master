@@ -1,3 +1,5 @@
+export { Aiyi } from './aiyi.ts'
+export { AvSubtitles } from './avSubtitles.ts'
 export { SubtitleCat } from './subtitlecat.ts'
 export { Thunder } from './thunder.ts'
 export type { ProcessedThunder } from './thunder.ts'

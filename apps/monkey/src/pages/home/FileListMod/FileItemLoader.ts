@@ -19,6 +19,8 @@ export class FileItemModLoader {
     private readonly listScrollBoxNode: HTMLElement,
     /** 加载的 item 修改器类 */
     private readonly mods: Array<FileListMod>,
+    /** 新版官方页面可直接提供已转换的文件信息。 */
+    private readonly providedItemInfo?: ItemInfo,
   ) {}
 
   /** 获取属性 */
@@ -48,12 +50,16 @@ export class FileItemModLoader {
 
   /** itemInfo */
   private get itemInfo(): ItemInfo {
+    if (this.providedItemInfo)
+      return this.providedItemInfo
+
     return {
       avNumber: this.avNumber,
       attributes: this.attributes,
       fileListType: this.fileListType,
       duration: this.duration,
       listScrollBoxNode: this.listScrollBoxNode,
+      surface: 'legacy',
     }
   }
 

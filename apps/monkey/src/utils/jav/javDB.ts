@@ -1,6 +1,9 @@
 import type { JavInfo } from './jav'
 import dayjs from 'dayjs'
-import { Jav, JAV_SOURCE } from './jav'
+import { appLogger } from '@/utils/logger'
+import { isSameAvNumber, Jav, JAV_SOURCE } from './jav'
+
+const logger = appLogger.sub('JavDB')
 
 /**
  * JavDB 类
@@ -27,7 +30,7 @@ export class JavDB extends Jav {
       throw new Jav.PageError()
     }
 
-    const detailUrl = this.getDetailUrl(await html.text())
+    const detailUrl = this.getDetailUrl(await html.text(), avNumber)
     if (!detailUrl) {
       throw new Jav.PageError()
     }
@@ -46,9 +49,29 @@ export class JavDB extends Jav {
     return await this.parseInfo(await avNumberPageResponse.text())
   }
 
-  getDetailUrl(html: string) {
+  getDetailUrl(html: string, avNumber: string) {
+    /*
+     * ================================================================================
+     * 步骤1：从搜索结果定位精确番号
+     * ================================================================================
+     * 目标：相似番号并列时不再默认打开第一项。
+     * 数据源：JavDB 搜索结果卡片。
+     * 操作：
+     * 1) 逐项读取卡片番号
+     * 2) 只返回标准化后完全一致的详情链接
+     */
+    logger.info('开始定位 JavDB 精确番号', avNumber)
     const dom = new DOMParser().parseFromString(html, 'text/html')
-    const page = dom.querySelector('.movie-list .item a')?.getAttribute('href')
+    const items = Array.from(dom.querySelectorAll('.movie-list .item'))
+    const exactItem = items.find((item) => {
+      const resultAvNumber = item
+        .querySelector('.video-title strong, .uid, [data-number]')
+        ?.textContent
+        ?.trim()
+      return isSameAvNumber(avNumber, resultAvNumber)
+    })
+    const page = exactItem?.querySelector('a[href]')?.getAttribute('href')
+    logger.info('JavDB 精确番号定位完成', avNumber, page ?? '')
     return page ? new URL(page, this.baseUrl).href : undefined
   }
 
@@ -128,6 +151,7 @@ export class JavDB extends Jav {
             name: i.textContent!,
             url,
             face,
+            faceReferer: url || this.detailUrl,
             sex: i.nextElementSibling?.classList.contains('female')
               ? (1 as const)
               : i.nextElementSibling?.classList.contains('male')
@@ -168,10 +192,31 @@ export class JavDB extends Jav {
       : undefined
   }
 
-  /** TODO: 单页封面 */
-  parseCoverSingle(): JavInfo['coverSingle'] {
+  parseCoverSingle(dom: Document): JavInfo['coverSingle'] {
+    /*
+     * ================================================================================
+     * 步骤1：解析 JavDB 单页封面
+     * ================================================================================
+     * 目标：从双页 covers 地址推导同资源的竖版 thumbs 地址，不返回空 URL。
+     * 数据源：详情页 img.video-cover。
+     * 操作：
+     * 1) 读取并标准化封面 URL
+     * 2) 把 /covers/ 映射为 /thumbs/，未知格式保留有效原图
+     */
+    logger.info('开始解析 JavDB 单页封面')
+
+    const cover = dom.querySelector('img.video-cover')
+      ?.getAttribute('src')
+      || dom.querySelector('img.video-cover')?.getAttribute('data-src')
+    if (!cover) {
+      logger.info('JavDB 单页封面解析完成，无封面')
+      return undefined
+    }
+
+    const url = new URL(cover, this.baseUrl).href.replace('/covers/', '/thumbs/')
+    logger.info('JavDB 单页封面解析完成', url)
     return {
-      url: '',
+      url,
       referer: this.detailUrl,
     }
   }

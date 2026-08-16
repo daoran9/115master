@@ -1,14 +1,10 @@
 import type { Share } from '@115master/drive115'
 import type { FunctionalComponent, PropType, SVGAttributes } from 'vue'
-import { loadIcons } from '@iconify/vue'
 import { defineComponent } from 'vue'
 import { I, Icon } from '@/icons'
 import FolderSvg from '@/icons/custom/folder.svg?component'
 import ImageFileSvg from '@/icons/custom/image-file.svg?component'
 import { resolveFileDragIcon } from './resolveFileDragIcon'
-
-// 预热异步图标数据，确保首次跟随层渲染时图标已经就绪。
-loadIcons([I.FILE_VIDEO, I.AUDIO_TRACK, I.DOCUMENT])
 
 /** 自定义图标在 Icon 内异步加载；跟随层首帧改用静态组件，避免短暂空白。 */
 const CUSTOM: Record<string, FunctionalComponent<SVGAttributes>> = {

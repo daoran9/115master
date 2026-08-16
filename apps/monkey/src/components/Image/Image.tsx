@@ -1,10 +1,13 @@
 import type { PropType, StyleValue, VNode } from 'vue'
 import type { ImageLoader, ImageResource } from '@/utils/imageLoader'
 import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
+import { appLogger } from '@/utils/logger'
 import LoadingError from '../LoadingError/LoadingError'
 
 type Fit = 'cover' | 'contain'
 type LoadState = 'loading' | 'error' | 'success'
+
+const logger = appLogger.sub('Image')
 
 /**
  * 通用图片加载组件：骨架 → 成功 / 错误回退三态。
@@ -15,6 +18,9 @@ type LoadState = 'loading' | 'error' | 'success'
 const Image = defineComponent({
   name: 'Image',
   inheritAttrs: false,
+  emits: {
+    error: (_message: string) => true,
+  },
   props: {
     src: { type: String, required: true },
     alt: { type: String, default: '' },
@@ -25,9 +31,10 @@ const Image = defineComponent({
     loader: { type: Object as PropType<ImageLoader>, default: undefined },
     fallback: { type: [Object, Function] as PropType<VNode | (() => VNode)>, default: undefined },
   },
-  setup(props, { attrs }) {
+  setup(props, { attrs, emit }) {
     const root = ref<HTMLElement>()
     const state = ref<LoadState>('loading')
+    const errorMessage = ref('')
     const displaySrc = ref('')
     const visible = ref(!props.lazy || typeof IntersectionObserver === 'undefined')
     let controller: AbortController | undefined
@@ -56,6 +63,27 @@ const Image = defineComponent({
       dispose(current)
       current = undefined
       displaySrc.value = ''
+      errorMessage.value = ''
+    }
+
+    function fail(message: string) {
+      /*
+       * ================================================================================
+       * 步骤1：收敛图片失败状态
+       * ================================================================================
+       * 目标：组件显示回退内容，同时让父级按需移除失败图片。
+       * 数据源：加载器异常、空响应或浏览器解码错误。
+       * 操作：
+       * 1) 保存错误并切换失败状态
+       * 2) 向父级发送一次错误事件
+       */
+      logger.info('开始处理图片加载失败', props.src)
+
+      errorMessage.value = message
+      state.value = 'error'
+      emit('error', message)
+
+      logger.info('图片加载失败处理完成', props.src)
     }
 
     async function load() {
@@ -63,7 +91,7 @@ const Image = defineComponent({
       const id = version
       const url = props.src
       if (!url) {
-        state.value = 'error'
+        fail('图片地址为空')
         return
       }
       state.value = 'loading'
@@ -81,16 +109,18 @@ const Image = defineComponent({
         }
         if (!result.src) {
           dispose(result)
-          state.value = 'error'
+          fail('图片加载器返回空地址')
           return
         }
         current = result
         displaySrc.value = result.src
       }
-      catch {
+      catch (error) {
         if (id !== version || controller.signal.aborted)
           return
-        state.value = 'error'
+        const message = error instanceof Error ? error.message : '图片加载失败'
+        logger.warn('图片加载器请求失败', message)
+        fail(message)
       }
     }
 
@@ -148,6 +178,7 @@ const Image = defineComponent({
           role={label ? 'img' : undefined}
           aria-label={label}
           aria-busy={state.value === 'loading' ? 'true' : undefined}
+          data-115master-image-error={state.value === 'error' ? errorMessage.value : undefined}
         >
           {state.value === 'loading' && (
             <div aria-hidden="true" class="skeleton ui-z-cover absolute inset-0 h-full w-full rounded-[inherit]" />
@@ -170,7 +201,8 @@ const Image = defineComponent({
                   dispose(current)
                   current = undefined
                   displaySrc.value = ''
-                  state.value = 'error'
+                  logger.warn('图片资源显示失败', props.src)
+                  fail('浏览器无法显示已加载图片')
                 }}
               />
             )}

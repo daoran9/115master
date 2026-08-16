@@ -57,13 +57,41 @@ test.describe('控制栏', () => {
     if (!theatre)
       throw new Error('剧院模式播放器容器无法测量')
     const viewport = await page.evaluate(() => ({
-      width: window.innerWidth,
+      width: document.body.clientWidth,
       height: window.innerHeight,
     }))
     expect(theatre.x).toBe(0)
     expect(theatre.y).toBe(0)
     expect(theatre.width).toBe(viewport.width)
     expect(theatre.height).toBe(viewport.height)
+
+    /*
+     * ================================================================================
+     * 步骤1：验证剧院模式保留纵向页面流
+     * ================================================================================
+     * 目标：播放器保持视口全宽，同时允许滚动到下方影片详情。
+     * 数据源：剧院模式播放器区和页面下方详情容器。
+     * 操作：
+     * 1) 核对根容器不再固定锁屏
+     * 2) 滚动页面并确认纵向位置变化
+     */
+    console.info('[e2e] 开始核对剧院模式纵向滚动')
+    const theatreLayout = await root.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        position: style.position,
+        overflowY: style.overflowY,
+        scrollHeight: document.scrollingElement?.scrollHeight ?? 0,
+        viewportHeight: window.innerHeight,
+      }
+    })
+    expect(theatreLayout.position).not.toBe('fixed')
+    expect(theatreLayout.overflowY).not.toBe('hidden')
+    expect(theatreLayout.scrollHeight).toBeGreaterThan(theatreLayout.viewportHeight)
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+    await page.evaluate(() => window.scrollTo(0, 0))
+    console.info('[e2e] 剧院模式纵向滚动核对完成')
 
     const stored = await page.evaluate(() =>
       JSON.parse(localStorage.getItem('x-player-preferences') ?? '{}'))

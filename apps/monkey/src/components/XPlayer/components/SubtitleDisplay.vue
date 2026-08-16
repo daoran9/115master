@@ -18,22 +18,24 @@
         </span>
         <div v-if="showActions" :class="styles.actions">
           <Button
-            variant="ghost"
+            variant="soft"
             size="xs"
             shape="circle"
-            :class="[styles.action, active && 'text-primary-content']"
+            :class="[styles.action, active && styles.actionActive]"
             :title="`查看 ${label}`"
-            @click="emit('view')"
+            :aria-label="`查看 ${label}`"
+            @click.stop="emit('view')"
           >
             <Icon :class="styles.actionIcon" :name="I.VIEW" />
           </Button>
           <Button
-            variant="ghost"
+            variant="soft"
             size="xs"
             shape="circle"
-            :class="[styles.action, active && 'text-primary-content']"
+            :class="[styles.action, active && styles.actionActive]"
             :title="`下载 ${label}`"
-            @click="emit('download')"
+            :aria-label="`下载 ${label}`"
+            @click.stop="emit('download')"
           >
             <Icon :class="styles.actionIcon" :name="I.DOWNLOAD" />
           </Button>
@@ -82,8 +84,16 @@ const styles = clsx({
   secondLine: 'flex items-center gap-1.5',
   label: 'line-clamp-2 text-sm leading-snug font-medium break-all',
   badge: 'rounded-md px-1.5 py-0.5 text-xs font-medium whitespace-nowrap',
-  actions: 'ml-auto flex items-center gap-1',
-  action: 'flex-shrink-0',
+  actions: 'border-base-content/15 ml-auto flex items-center gap-1 border-l pl-2',
+  action: [
+    'size-7 min-h-7 flex-shrink-0 p-0',
+    'border-base-content/25 bg-base-100/80 text-base-content border',
+    'hover:border-base-content/40 hover:bg-base-200',
+  ],
+  actionActive: [
+    'border-primary-content/50 bg-primary-content/15 text-primary-content',
+    'hover:bg-primary-content/25',
+  ],
   actionIcon: 'size-4',
 })
 </script>

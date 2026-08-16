@@ -17,8 +17,13 @@ test.describe('新版官方页面兼容入口', () => {
      * 2) 校验按钮地址和唯一性
      */
     const launcher = page.getByRole('link', { name: '打开 115Master Fusion' })
+    const controls = page.locator('[data-115master-controls]')
     await expect(launcher).toHaveCount(1)
     await expect(launcher).toHaveAttribute('href', `${MASTER_URL}#/drive`)
+    await expect(launcher.locator('svg')).toBeVisible()
+    await expect(controls).toHaveAttribute('data-placement', 'floating')
+    await expect(controls).toHaveAttribute('data-115master-version', '2.0.0-beta.82')
+    await expect(page.getByRole('button', { name: /视频预览/ })).toHaveCount(0)
 
     /**
      * ================================================================================

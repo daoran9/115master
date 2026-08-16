@@ -6,7 +6,7 @@ import { spaceInfo } from './fixtures/space'
 import { userAq } from './fixtures/user'
 import { homeHtml } from './pages/homeHtml'
 import { masterHtml } from './pages/masterHtml'
-import { officialHtml } from './pages/officialHtml'
+import { officialHtml, officialStorageHtml } from './pages/officialHtml'
 
 /**
  * 路由式 mock：单条 page.route 通配路由内按注册顺序匹配 URL
@@ -125,6 +125,13 @@ export function defaults() {
     if (!request.isNavigationRequest())
       return
     return html(route, officialHtml())
+  })
+
+  /** 新版 /storage/allfiles 原生文件列表。 */
+  api.use(/^https:\/\/115\.com\/storage\/allfiles/, ({ route, request }) => {
+    if (!request.isNavigationRequest())
+      return
+    return html(route, officialStorageHtml())
   })
 
   /** HOME 文档（官方文件列表 DOM） */

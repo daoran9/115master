@@ -98,6 +98,8 @@ export class GMRequest implements IRequest {
         responseType: options.responseType,
         nocache: !useCache,
         redirect,
+        cookie: options.cookie,
+        cookiePartition: options.cookiePartition,
         onload: async (rawResponse) => {
           try {
             /** 解析响应头 */

@@ -14,6 +14,7 @@ const logger = appLogger.sub('FileItemModActressInfo')
 export class FileItemModActressInfo extends FileItemModBase {
   readonly SETTING_KEYS = ['enableActressFaces'] as const
   private actressDom: HTMLImageElement | null = null
+  private actressContainer: HTMLElement | null = null
   private loadId = 0
   private objectUrl: string | null = null
 
@@ -35,13 +36,52 @@ export class FileItemModActressInfo extends FileItemModBase {
       return
     }
 
-    this.itemNode.classList.add('with-actress-info')
     const actressDom = document.createElement('img')
     actressDom.alt = actress.filename
     actressDom.loading = 'lazy'
     actressDom.className = 'actress-info-img'
-    this.itemNode.querySelector('.file-name-wrap')?.prepend(actressDom)
+    actressDom.setAttribute('data-115master-actress', '')
+    /*
+     * ================================================================================
+     * 步骤1：按页面形态约束演员头像
+     * ================================================================================
+     * 目标：新旧页面统一复现旧版头像外观。
+     * 数据源：文件项所属页面形态。
+     * 操作：
+     * 1) 固定为旧版 50×50 圆形头像
+     * 2) 新版只改变挂载容器，不改变头像外观
+     */
+    logger.info('开始设置演员头像显示模式')
+
+    // eslint-disable-next-line jsdoc/convert-to-jsdoc-comments -- 项目步骤注释使用编号行注释。
+    // 1.1 识别新版 115 原生文件列表附加区。
+    const isOfficialSurface = this.itemInfo.surface === 'official'
+    const avatarSize = 50
+
+    // 1.2 写入与页面形态对应的固定尺寸和缩放方式。
+    actressDom.style.width = `${avatarSize}px`
+    actressDom.style.height = `${avatarSize}px`
+    actressDom.style.minWidth = `${avatarSize}px`
+    actressDom.style.maxWidth = `${avatarSize}px`
+    actressDom.style.flex = `0 0 ${avatarSize}px`
+    actressDom.style.borderRadius = '50%'
+    actressDom.style.objectFit = 'cover'
+    logger.info('演员头像显示模式设置完成', isOfficialSurface ? 'official' : 'legacy')
+    const nameContainer = this.itemInfo.surface === 'official'
+      ? this.itemInfo.presentation === 'panel'
+        ? this.itemNode.closest('[data-115master-grid-panel]')
+          ?.querySelector<HTMLElement>('[data-115master-grid-panel-header]')
+          ?? this.itemNode
+        : this.itemNode
+      : this.itemNode.querySelector<HTMLElement>('.file-name-wrap')
+        ?? this.itemNode.querySelector('.file-name-responsive')?.parentElement
+    const styleContainer = this.itemInfo.surface === 'official'
+      ? nameContainer
+      : this.itemNode
+    styleContainer?.classList.add('with-actress-info')
+    nameContainer?.prepend(actressDom)
     this.actressDom = actressDom
+    this.actressContainer = styleContainer ?? null
 
     try {
       /** 尝试从缓存获取图片 */
@@ -90,7 +130,8 @@ export class FileItemModActressInfo extends FileItemModBase {
     this.loadId += 1
     this.actressDom?.remove()
     this.actressDom = null
-    this.itemNode.classList.remove('with-actress-info')
+    this.actressContainer?.classList.remove('with-actress-info')
+    this.actressContainer = null
     if (this.objectUrl)
       URL.revokeObjectURL(this.objectUrl)
     this.objectUrl = null

@@ -45,14 +45,44 @@ export function registerMagnetTaskHandler() {
  * 注册磁力链接协议处理程序
  */
 export function registerMagnetProtocolHandler() {
-  if (navigator.registerProtocolHandler) {
+  /*
+   * ================================================================================
+   * 步骤1：注册磁力协议处理程序
+   * ================================================================================
+   * 目标：为支持该 API 的浏览器注册磁力链接入口，同时保证注册失败不影响主页面。
+   * 数据源：当前页面 origin 与 navigator.registerProtocolHandler。
+   * 操作：
+   * 1) 生成同源、包含 %s 占位符的中转地址
+   * 2) 捕获浏览器拒绝注册时抛出的 SecurityError
+   */
+  logger.info('开始注册磁力协议处理程序')
+
+  if (!navigator.registerProtocolHandler) {
+    logger.warn('此浏览器不支持注册协议处理程序')
+    logger.info('磁力协议处理程序注册步骤结束')
+    return false
+  }
+
+  try {
+    /** 1.1 生成同源协议中转地址，避免 115Browser 拒绝相对 URL */
+    const handlerUrl = new URL(
+      '/web/lixian/master/magnet/?url=%s',
+      window.location.origin,
+    ).href
+
+    // 1.2 请求浏览器注册磁力协议
     navigator.registerProtocolHandler(
       'magnet',
-      '/web/lixian/master/magnet/?url=%s',
+      handlerUrl,
     )
+    logger.info('磁力协议处理程序注册完成')
+    return true
   }
-  else {
-    logger.error('此浏览器不支持注册协议处理程序')
+  catch (error) {
+    // 1.3 浏览器策略拒绝时保留其余脚本功能
+    logger.warn('当前浏览器拒绝磁力协议注册，继续启动页面功能', error)
+    logger.info('磁力协议处理程序注册步骤结束')
+    return false
   }
 }
 

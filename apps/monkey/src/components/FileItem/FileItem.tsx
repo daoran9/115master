@@ -284,7 +284,10 @@ const FileItem = defineComponent({
                   group-data-[select-mode=true]:hidden
                 "
               >
-                <ExtInfo avNumber={avNumber.value} variant="drive" />
+                <ExtInfo
+                  avNumber={avNumber.value}
+                  variant="drive"
+                />
               </div>
             )}
           </div>

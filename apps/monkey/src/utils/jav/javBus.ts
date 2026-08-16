@@ -1,6 +1,9 @@
 import type { JavInfo } from './jav'
 import dayjs from 'dayjs'
+import { appLogger } from '@/utils/logger'
 import { Jav, JAV_SOURCE } from './jav'
+
+const logger = appLogger.sub('JavBus')
 
 /**
  * JavBus 类
@@ -91,28 +94,41 @@ export class JavBus extends Jav {
   }
 
   parseActor() {
+    /*
+     * ================================================================================
+     * 步骤1：解析 JavBus 演员头像
+     * ================================================================================
+     * 目标：保留真实头像地址，并交给带 Referer 的 GM 图片加载器读取。
+     * 数据源：演员列表 a 和 img 节点。
+     * 操作：
+     * 1) 标准化演员详情与头像地址
+     * 2) 标记详情页为头像 Referer
+     */
+    logger.info('开始解析 JavBus 演员头像')
+
     const actors
       = this.labels['演員']?.parentElement?.nextElementSibling?.querySelectorAll(
         'li',
       )
-    return actors?.length
+    const result = actors?.length
       ? Array.from(actors).map((i) => {
           const a = i.querySelector('a')
           const img = i.querySelector('img')
-
-          // TODO 暂时无法加载头像，需要专门写个支持油猴跨域加载的图片组件来加载
-          // const faceHref = img?.getAttribute("src");
-          // const face = faceHref
-          // ? new URL(faceHref, this.baseUrl).href
-          // : undefined;
+          const actorHref = a?.getAttribute('href')
+          const faceHref = img?.getAttribute('src')
+            || img?.getAttribute('data-src')
           return {
             name: img?.getAttribute('title') ?? '',
-            url: a?.getAttribute('href') ?? undefined,
+            url: actorHref ? new URL(actorHref, this.baseUrl).href : undefined,
             sex: undefined,
-            face: '',
+            face: faceHref ? new URL(faceHref, this.baseUrl).href : undefined,
+            faceReferer: faceHref ? this.detailUrl : undefined,
           }
         })
       : undefined
+
+    logger.info('JavBus 演员头像解析完成', result?.length ?? 0)
+    return result
   }
 
   parseStudio() {

@@ -12,6 +12,12 @@ export function useSubtitles(ctx: PlayerContext) {
   /** 上一个字幕 */
   const previousSubtitle = ref<Subtitle | null>(null)
 
+  /** 用户是否已经明确选择或关闭字幕 */
+  let hasExplicitPreference = false
+
+  /** 用户明确选择的字幕 id；null 表示明确关闭 */
+  let preferredSubtitleId: string | null = null
+
   /** 默认字幕 */
   const defaultSubtitle = computed(() => {
     return (
@@ -44,6 +50,10 @@ export function useSubtitles(ctx: PlayerContext) {
 
   /** 切换字幕 */
   const change = (subtitle: Subtitle | null, init = false) => {
+    if (!init) {
+      hasExplicitPreference = true
+      preferredSubtitleId = subtitle?.id ?? null
+    }
     if (subtitle) {
       previousSubtitle.value = subtitle
     }
@@ -109,8 +119,34 @@ export function useSubtitles(ctx: PlayerContext) {
 
   /** 设置默认字幕 */
   const restoreLastSubtitle = (subtitles: Subtitle[]) => {
-    const defaultSubtitle = subtitles.find(s => s.default)
-    change(defaultSubtitle ?? null, true)
+    /**
+     * ============================================================================
+     * 步骤1：恢复当前字幕选择
+     * ============================================================================
+     * 目标：字幕异步刷新后保持用户选择；首次加载时自动启用排序后的第一条。
+     * 数据源：播放器字幕列表、用户本次播放中的明确选择。
+     * 操作：
+     * 1) 有明确偏好时按字幕 id 恢复，明确关闭时保持关闭。
+     * 2) 没有偏好时优先 default 标记，再回退到 No.1。
+     */
+    ctx.logger.info('开始恢复播放器字幕选择', subtitles.length)
+
+    /** 1.1 优先恢复用户在本次播放中的明确选择 */
+    if (hasExplicitPreference) {
+      const preferredSubtitle = preferredSubtitleId === null
+        ? null
+        : subtitles.find(subtitle => subtitle.id === preferredSubtitleId) ?? null
+      change(preferredSubtitle, true)
+      ctx.logger.info('播放器字幕选择恢复完成', preferredSubtitle?.id ?? 'off')
+      return
+    }
+
+    /** 1.2 首次加载优先 default 标记，否则自动启用排序后的 No.1 */
+    const initialSubtitle = subtitles.find(subtitle => subtitle.default)
+      ?? subtitles[0]
+      ?? null
+    change(initialSubtitle, true)
+    ctx.logger.info('播放器字幕选择恢复完成', initialSubtitle?.id ?? 'off')
   }
 
   // 监听字幕列表变化，设置默认字幕

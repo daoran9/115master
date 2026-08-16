@@ -49,3 +49,8 @@ test-results
 playwright-report
 blob-report
 __diffs__
+
+# 115Master local live-verification artifacts
+/apps/monkey/output/
+/.scratch/115-next/
+/design-qa.md

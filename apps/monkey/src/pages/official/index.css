@@ -1,0 +1,216 @@
+[data-115master-row-addon][data-115master-view='list'],
+[data-115master-row-addon][data-115master-view='virtual-list'] {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 32px 8px 72px;
+  border-bottom: 1px solid #f0f2f5;
+  background: #fff;
+}
+
+[data-115master-row-addon][data-115master-view='list'] [data-115master-native-actions],
+[data-115master-row-addon][data-115master-view='virtual-list'] [data-115master-native-actions],
+[data-115master-grid-panel] [data-115master-native-actions] {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+  min-height: 24px;
+  color: #2777f8;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+[data-115master-row-addon] [data-115master-native-actions] a,
+[data-115master-grid-panel] [data-115master-native-actions] a {
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+[data-115master-row-addon] [data-115master-native-actions] a:hover,
+[data-115master-grid-panel] [data-115master-native-actions] a:hover {
+  text-decoration: underline;
+}
+
+[data-115master-row-addon][data-115master-view='list'] [data-115master-detail],
+[data-115master-row-addon][data-115master-view='list'] [data-115master-preview],
+[data-115master-row-addon][data-115master-view='virtual-list'] [data-115master-detail],
+[data-115master-row-addon][data-115master-view='virtual-list'] [data-115master-preview],
+[data-115master-grid-panel] [data-115master-detail],
+[data-115master-grid-panel] [data-115master-preview] {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+[data-115master-row-addon][data-115master-view='list'].with-actress-info,
+[data-115master-row-addon][data-115master-view='virtual-list'].with-actress-info,
+[data-115master-grid-panel-content].with-actress-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding-top: 6px;
+}
+
+/*
+ * ================================================================================
+ * 步骤1：约束新版演员头像
+ * ================================================================================
+ * 目标：在 Fusion 附加区复现旧版头像外观。
+ * 数据源：新版列表和网格详情层内的演员头像。
+ * 操作：
+ * 1) 固定为旧版 50×50 尺寸
+ * 2) 使用圆形和 cover，与旧版文件列表一致
+ */
+[data-115master-row-addon] .actress-info-img,
+[data-115master-grid-panel] .actress-info-img {
+  width: 50px;
+  height: 50px;
+  flex: 0 0 50px;
+  border: 2px solid #e6eaf0;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #f3f5f8;
+}
+
+/*
+ * ================================================================================
+ * 步骤1：建立独立详情入口定位上下文
+ * ================================================================================
+ * 目标：让每张网格卡片独立承载可选的 Fusion 入口。
+ * 数据源：适配器写入的 data-115master-panel-anchor 标记。
+ * 操作：
+ * 1) 只调整插件已增强文件项的定位上下文
+ * 2) 不改变卡片尺寸、间距和文档流位置
+ */
+[data-115master-panel-anchor] {
+  position: relative;
+}
+
+[data-115master-row-addon][data-115master-view='grid'] {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 20;
+  display: block;
+  width: 26px;
+  height: 26px;
+  pointer-events: none;
+}
+
+[data-115master-grid-toggle],
+[data-115master-grid-close] {
+  display: inline-flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid #d9e0e8;
+  background: #fff;
+  color: #2878ed;
+  cursor: pointer;
+}
+
+[data-115master-grid-toggle] {
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+  pointer-events: auto;
+}
+
+[data-115master-grid-toggle]:hover,
+[data-115master-grid-toggle][aria-expanded='true'] {
+  border-color: #8bb9fb;
+  background: #eaf3ff;
+}
+
+[data-115master-grid-toggle] iconify-icon,
+[data-115master-grid-close] iconify-icon {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+}
+
+[data-115master-grid-panel] {
+  position: fixed;
+  top: 72px;
+  right: 24px;
+  bottom: 24px;
+  z-index: 2147483645;
+  display: flex;
+  width: min(760px, calc(100vw - 48px));
+  box-sizing: border-box;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #dce2ea;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.24);
+  color: #27364a;
+}
+
+[data-115master-grid-panel][hidden] {
+  display: none;
+}
+
+[data-115master-grid-panel-header] {
+  display: flex;
+  min-height: 44px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px 6px 16px;
+  border-bottom: 1px solid #edf0f4;
+}
+
+[data-115master-grid-panel-header] strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-115master-grid-close] {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-color: transparent;
+  border-radius: 4px;
+  color: #5a6675;
+}
+
+[data-115master-grid-close]:hover {
+  background: #f2f5f8;
+  color: #1f2937;
+}
+
+[data-115master-grid-panel-content] {
+  display: block;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 8px 12px 16px;
+}
+
+@media (max-width: 900px) {
+  [data-115master-row-addon][data-115master-view='list'],
+  [data-115master-row-addon][data-115master-view='virtual-list'] {
+    padding-right: 16px;
+    padding-left: 48px;
+  }
+
+  [data-115master-row-addon] [data-115master-native-actions] {
+    gap: 6px;
+  }
+
+  [data-115master-grid-panel] {
+    top: 56px;
+    right: 8px;
+    bottom: 8px;
+    width: calc(100vw - 16px);
+  }
+}

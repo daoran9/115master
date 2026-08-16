@@ -28,7 +28,9 @@ test.describe('TopHeaderMod', () => {
     /** 预览开关：默认 enableFilelistPreview=true → active */
     const preview = page.locator('a.master-preview-switch-btn')
     await expect(preview).toBeAttached()
-    await expect(preview).toHaveAttribute('title', '开启文件预览')
+    await expect(preview).toHaveAttribute('title', '关闭文件预览')
+    await expect(preview).toHaveAttribute('aria-label', '关闭文件预览')
+    await expect(preview).toHaveAttribute('aria-pressed', 'true')
     await expect(preview).toHaveClass(/active/)
     await expect(preview.locator('iconify-icon.preview-off')).toBeAttached()
     await expect(preview.locator('iconify-icon.preview-on')).toBeAttached()

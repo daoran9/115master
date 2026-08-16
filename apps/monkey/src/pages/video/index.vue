@@ -75,6 +75,21 @@
           </template>
           <template #headerRight="{ ctx }">
             <div class="flex items-center gap-2">
+              <PlayerControlSurface v-if="isWindows && DataFileInfo.isReady">
+                <!-- Windows MPV 播放按钮 -->
+                <Button
+                  variant="ghost"
+                  shape="circle"
+                  :title="getActionNameTip(ctx, 'MPV 播放', 'playWithMPV')"
+                  @click="handleLocalPlay('mpv')"
+                >
+                  <Icon
+                    :name="I.WINDOW"
+                    :class="styles.controls.btn.icon"
+                  />
+                </Button>
+              </PlayerControlSurface>
+
               <PlayerControlSurface v-if="isMac && DataFileInfo.isReady">
                 <!-- IINA 播放按钮 -->
                 <Button
@@ -175,10 +190,10 @@ import { clsx } from '@/utils/clsx'
 import { drive115 } from '@/utils/drive115Instance'
 import { getAvNumber } from '@/utils/getNumber'
 import { appLogger } from '@/utils/logger'
-import { isMac } from '@/utils/platform'
+import { isMac, isWindows } from '@/utils/platform'
 import { goToPlayer } from '@/utils/route'
 import { useUserSetting } from '@/utils/userSettings'
-import { webLinkIINA, webLinkShortcutsMpv } from '@/utils/weblink'
+import { webLinkIINA, webLinkWindowsMpv } from '@/utils/weblink'
 import About from './components/About/index.vue'
 import { FileActionMenu } from './components/FileActionMenu'
 import HeaderInfo from './components/HeaderInfo/index.vue'
@@ -208,7 +223,7 @@ const styles = clsx({
       '[--app-playlist-width:calc(100%*var(--app-playlist-ratio))]',
       'relative',
     ],
-    mainTheatre: 'ui-z-host fixed inset-0 h-screen w-screen overflow-hidden bg-black',
+    mainTheatre: 'w-full bg-black',
     pageMain: [
       'relative flex min-h-screen w-full items-center justify-center overflow-hidden',
       'bg-base-100 px-4 py-6 sm:px-8',
@@ -288,23 +303,24 @@ const moveAction = useMoveAction()
 const driveStore = useDriveStore()
 
 /** 同步影片详情数据。 */
-function syncMovieInfo(avNumber = getAvNumber(DataFileInfo.state.file_name)) {
+function syncMovieInfo(
+  avNumber = getAvNumber(DataFileInfo.state.file_name),
+) {
   /*
    * ================================================================================
    * 步骤1：同步播放页影片详情
    * ================================================================================
    * 目标：用运行时设置替代 Plus 编译门控，并避免关闭时请求外部资料源。
    * 操作：
-   * 1) 清理上一文件的影片资料
-   * 2) 开关开启且识别到番号时加载 JavDB 与 JavBus
+   * 1) 关闭或无标识时清理上一文件资料
+   * 2) 普通番号加载三个来源，FC2 增加 FD2PPV 来源
    */
   logger.info('开始同步播放页影片详情', avNumber)
 
-  DataMovieInfo.clear()
-  if (showMovieInfo.value && avNumber) {
-    DataMovieInfo.javDBState.execute(0, avNumber)
-    DataMovieInfo.javBusState.execute(0, avNumber)
-  }
+  if (showMovieInfo.value && avNumber)
+    DataMovieInfo.load(avNumber)
+  else
+    DataMovieInfo.clear()
 
   logger.info('播放页影片详情同步完成', avNumber)
 }
@@ -467,11 +483,23 @@ const ACTION_MAP: ActionMap = {
       })
     },
   },
+
+  playWithMPV: {
+    name: 'MPV 播放',
+    group: ACTION_GROUPS.EXTERNAL,
+    keydown: (ctx) => {
+      handleLocalPlay('mpv')
+      ctx.hud?.show({
+        title: 'MPV 播放',
+      })
+    },
+  },
 } satisfies ActionMap
 /** 动作键绑定 */
 const ACTION_KEY_BINDINGS = {
   toggleFavorite: [],
   playWithIINA: [],
+  playWithMPV: [],
 } satisfies ActionKeyBindings
 /** 外部动作配置 */
 const extShortcuts = {
@@ -490,13 +518,25 @@ async function handleSubtitleChange(subtitle: Subtitle | null) {
 
 /** 本地播放 */
 async function handleLocalPlay(player: LocalPlayer) {
+  /*
+   * ================================================================================
+   * 步骤1：交给本地播放器打开当前视频
+   * ================================================================================
+   * 目标：macOS 使用 IINA，Windows 使用已注册的 master115-mpv 协议。
+   * 数据源：当前 pickCode 对应的临时下载地址和鉴权信息。
+   * 操作：
+   * 1) 获取当前文件下载信息
+   * 2) 按平台播放器生成协议链接
+   */
+  logger.info('开始打开本地播放器', player)
+
   if (!params.pickCode.value) {
     throw new Error('pickCode is required')
   }
   const download = await drive115.video.getFileDownloadUrl(params.pickCode.value)
   switch (player) {
     case 'mpv':
-      open(webLinkShortcutsMpv(download))
+      open(webLinkWindowsMpv(download))
       break
     case 'iina':
       xplayerRef.value?.interruptSource()
@@ -505,6 +545,7 @@ async function handleLocalPlay(player: LocalPlayer) {
       }, 300)
       break
   }
+  logger.info('本地播放器打开请求完成', player)
 }
 
 async function changeVideo(item: Share.Entity.FilesItem) {
@@ -616,7 +657,13 @@ async function loadData(isFirst = true) {
       // 加载番号信息
       syncMovieInfo(avNumber)
       // 加载字幕
-      DataSubtitles.execute(0, pickCode, res.file_name, avNumber)
+      DataSubtitles.execute(
+        0,
+        pickCode,
+        res.file_name,
+        avNumber,
+        Number(res.play_long),
+      )
 
       // 加载播放列表（cid 变化时或首次加载）
       if (res.parent_id && (isFirst || params.cid.value !== res.parent_id)) {

@@ -4,7 +4,9 @@
 export function srtToVtt(srt: string): string {
   let vtt = 'WEBVTT\n\n'
 
-  const blocks = srt.split(/\n\s*\n/)
+  /** 1.1 统一 Windows、Unix 和旧 Mac 换行，避免时间码行末残留 \r */
+  const normalizedSrt = srt.replace(/\r\n?/g, '\n')
+  const blocks = normalizedSrt.split(/\n\s*\n/)
 
   blocks.forEach((block) => {
     if (!block.trim())

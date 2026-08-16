@@ -1,5 +1,14 @@
 <template>
-  <div v-if="subtitles.current.value" :class="styles.container">
+  <div
+    v-if="subtitles.current.value"
+    :class="styles.container"
+    data-xplayer-subtitle-track
+    :data-subtitle-id="subtitles.current.value.id"
+    :data-cue-count="subtitleParsed.length"
+    :data-current-time="currentTime"
+    :data-current-cue-start="currentSubtitle?.start"
+    :data-current-cue-end="currentSubtitle?.end"
+  >
     <div
       v-if="currentSubtitle"
       :class="styles.content"
@@ -36,8 +45,8 @@ const { subtitles, cssVar, refs, playerCore, logger } = usePlayerContext()
 const safeAreaBottom = computed(() => cssVar?.safeAreaBottom.value)
 /** 当前字幕 */
 const current = computed(() => subtitles.current.value)
-/** 当前字幕文本 */
-const text = shallowRef<string | null>(null)
+/** 播放器当前时间 */
+const currentTime = computed(() => playerCore.value?.currentTime ?? 0)
 /** 视频元素的边界 */
 const playerElementBounding = useElementBounding(refs.playerElementRef)
 /** 字幕字体大小 */
@@ -56,17 +65,16 @@ const subtitleParsed = shallowRef<
     et: number
   }[]
 >([])
+/** 字幕加载序号，用于丢弃较慢的旧请求 */
+let loadSequence = 0
 /**
  * 当前字幕
  */
 const currentSubtitle = computed(() => {
   return subtitleParsed.value.find((subtitle) => {
-    if (!playerCore.value) {
-      return false
-    }
     return (
-      subtitle.st <= playerCore.value?.currentTime
-      && subtitle.et >= playerCore.value?.currentTime
+      subtitle.st <= currentTime.value
+      && subtitle.et >= currentTime.value
     )
   })
 })
@@ -81,14 +89,20 @@ const cleanedText = computed(() => {
  * @returns 秒
  */
 function timeToSeconds(time: string) {
-  const [hours = 0, minutes = 0, seconds = 0] = time.split(':').map(Number)
-  const [secondsPart = '0', msPart = '0'] = seconds.toString().split('.')
+  const match = time.trim().match(
+    /^(?:(\d+):)?(\d{1,2}):(\d{1,2})(?:[.,](\d{1,3}))?$/,
+  )
+  if (!match)
+    return Number.NaN
+
+  const [, hours = '0', minutes = '0', seconds = '0', fraction = '0'] = match
+  const milliseconds = Number(fraction.padEnd(3, '0'))
 
   return (
-    hours * 3600
-    + minutes * 60
-    + parseInt(secondsPart)
-    + parseInt(msPart) / 1000
+    Number(hours) * 3600
+    + Number(minutes) * 60
+    + Number(seconds)
+    + milliseconds / 1000
   )
 }
 
@@ -97,23 +111,44 @@ function timeToSeconds(time: string) {
  * @param text 字幕文本
  */
 function parseSubtitleVTT(text: string) {
-  const blocks = text.split(/\n\n/).filter(block => block.trim() !== '')
-  const subtitles = []
+  const normalizedText = text.replace(/\r\n?/g, '\n')
+  const blocks = normalizedText
+    .split(/\n\s*\n/)
+    .filter(block => block.trim() !== '')
+  const subtitles: typeof subtitleParsed.value = []
   for (const block of blocks) {
     if (/WEBVTT/.test(block))
       continue
 
     const lines = block.split(/\n/)
-    /** 首行视为时间，其余为文本 */
-    const time = lines.shift() ?? ''
-    const text = lines.join('\n') ?? ''
+    const timeIndex = lines.findIndex(line => line.includes('-->'))
+    if (timeIndex < 0)
+      continue
+
+    /** 时间行之前允许存在 VTT cue 标识，之后均视为字幕文本 */
+    const time = lines[timeIndex] ?? ''
+    const text = lines.slice(timeIndex + 1).join('\n')
 
     const [start, end] = time.split('-->')
-    const st = timeToSeconds(start.trim())
-    const et = timeToSeconds(end.trim())
-    subtitles.push({ start, end, text, st, et })
+    if (!start || !end)
+      continue
+
+    const normalizedStart = start.trim()
+    const normalizedEnd = end.trim().split(/\s+/)[0] ?? ''
+    const st = timeToSeconds(normalizedStart)
+    const et = timeToSeconds(normalizedEnd)
+    if (!Number.isFinite(st) || !Number.isFinite(et) || et < st)
+      continue
+
+    subtitles.push({
+      start: normalizedStart,
+      end: normalizedEnd,
+      text,
+      st,
+      et,
+    })
   }
-  subtitleParsed.value = subtitles
+  return subtitles
 }
 
 /**
@@ -131,11 +166,11 @@ function parseSubtitle(text: string, format: Subtitle['format']) {
       break
     default:
       logger.warn('不支持的字幕格式:', format)
-      return
+      return []
   }
   if (!formatedText)
-    return
-  parseSubtitleVTT(formatedText)
+    return []
+  return parseSubtitleVTT(formatedText)
 }
 
 function fetchSubtitle(url: string) {
@@ -148,28 +183,55 @@ function fetchSubtitle(url: string) {
  * @param subtitle 字幕
  */
 async function loadSubtitle(subtitle: Subtitle | null) {
+  /**
+   * ================================================================================
+   * 步骤1：加载当前选中的字幕
+   * ================================================================================
+   * 目标：只显示最后一次选择的字幕，避免较慢的旧请求覆盖当前字幕。
+   * 数据源：当前字幕的 Blob 或远程 URL。
+   * 操作：
+   * 1) 递增加载序号并清空上一条字幕轨。
+   * 2) 读取、解析字幕，并在写入前校验序号和当前选项。
+   */
+  const sequence = ++loadSequence
+  subtitleParsed.value = []
+
   if (!subtitle) {
-    text.value = null
+    logger.info('字幕已关闭')
     return
   }
-  if (subtitle.raw) {
-    parseSubtitle(await subtitle.raw.text(), subtitle.format)
-  }
-  else if (subtitle.url) {
-    try {
-      const subtitleText = await fetchSubtitle(subtitle.url)
-      parseSubtitle(await subtitleText.text(), subtitle.format)
+
+  logger.info('开始加载字幕', subtitle.id)
+
+  try {
+    /** 1.1 读取当前字幕文本 */
+    let subtitleText: string
+    if (subtitle.raw) {
+      subtitleText = await subtitle.raw.text()
     }
-    catch (e) {
+    else if (subtitle.url) {
+      subtitleText = await (await fetchSubtitle(subtitle.url)).text()
+    }
+    else {
+      logger.error('字幕数据无有效内容')
+      return
+    }
+
+    /** 1.2 解析字幕，并丢弃已过期的异步结果 */
+    const parsed = parseSubtitle(subtitleText, subtitle.format)
+    if (sequence !== loadSequence || current.value?.id !== subtitle.id) {
+      logger.info('字幕加载结果已过期', subtitle.id)
+      return
+    }
+
+    subtitleParsed.value = parsed
+    logger.info('字幕加载完成', subtitle.id, parsed.length)
+  }
+  catch (e) {
+    if (sequence === loadSequence)
       logger.error('请求字幕文件失败', e)
-    }
-  }
-  else {
-    logger.error('字幕数据无有效内容')
   }
 }
 
-watch(current, () => {
-  loadSubtitle(current.value)
-})
+watch(current, subtitle => void loadSubtitle(subtitle), { immediate: true })
 </script>

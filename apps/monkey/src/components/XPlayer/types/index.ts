@@ -96,6 +96,16 @@ export interface SubtitleBase {
   source?: string
   /** 字幕来源 ICON */
   sourceIcon?: string
+  /** 字幕对应的视频时长（毫秒） */
+  durationMs?: number
+  /** 来源质量分 */
+  sourceScore?: number
+  /** 来源指纹分 */
+  fingerprintScore?: number
+  /** 字幕标题中已核对的标准番号。 */
+  avNumber?: string
+  /** 来源接口已把字幕绑定到当前视频。 */
+  trustedForVideo?: boolean
 }
 
 /** 字幕 */

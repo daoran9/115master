@@ -40,7 +40,8 @@
   },
   "dependencies": {
     "@115master/shared": "workspace:*",
-    "blueimp-md5": "^2.19.0"
+    "blueimp-md5": "^2.19.0",
+    "fflate": "^0.8.2"
   },
   "devDependencies": {
     "@115master/eslint-config": "workspace:*",

@@ -115,23 +115,48 @@ export class TopHeaderMod extends BaseMod {
 
   /** 创建预览切换开关 */
   private createPreviewSwitchButton() {
-    const value = userSettings.value.enableFilelistPreview
+    /*
+     * ================================================================================
+     * 步骤1：创建旧版文件预览开关
+     * ================================================================================
+     * 目标：让旧版 iframe 内真实开关同步图标状态、提示和无障碍属性。
+     * 数据源：USER_SETTINGS.enableFilelistPreview。
+     * 操作：
+     * 1) 按当前设置初始化 active、title 和 aria-pressed
+     * 2) 点击后持久化设置并立即同步按钮状态
+     */
+    this.logger.info('开始创建旧版文件预览开关')
+
+    /** 1.1 创建按钮和离线图标。 */
     const button = document.createElement('a')
     button.classList.add('button', 'btn-line', 'master-preview-switch-btn')
-    if (value) {
-      button.classList.add('active')
-    }
-    button.setAttribute('title', '开启文件预览')
     button.href = 'javascript:void(0)'
+    button.setAttribute('role', 'button')
     button.innerHTML = `
       <iconify-icon class="preview-off" icon="${I.PREVIEW_OFF}" noobserver></iconify-icon>
       <iconify-icon class="preview-on" icon="${I.PREVIEW_ON}" noobserver></iconify-icon>
     `
+
+    /** 1.2 集中同步可见状态和辅助属性。 */
+    const syncState = () => {
+      const enabled = userSettings.value.enableFilelistPreview
+      button.classList.toggle('active', enabled)
+      button.setAttribute('aria-pressed', String(enabled))
+      button.setAttribute(
+        'aria-label',
+        enabled ? '关闭文件预览' : '开启文件预览',
+      )
+      button.title = enabled ? '关闭文件预览' : '开启文件预览'
+    }
+    syncState()
+
+    /** 1.3 点击后写入设置，并同步本 iframe 中的真实开关。 */
     button.onclick = () => {
       userSettings.value.enableFilelistPreview
         = !userSettings.value.enableFilelistPreview
-      button.classList.toggle('active')
+      syncState()
     }
+    this.logger.info('旧版文件预览开关创建完成')
     return button
   }
 

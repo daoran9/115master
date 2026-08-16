@@ -43,7 +43,13 @@ export interface ProcessedThunder {
   format: string
   title: string
   extraName: string
+  /** 视频时长（毫秒） */
+  durationMs: number
   score: number
+  /** 指纹评分 */
+  fingerprintScore: number
+  /** 从字幕名提取的标准番号。 */
+  avNumber?: string
 }
 
 /**
@@ -51,10 +57,12 @@ export interface ProcessedThunder {
  */
 export class Thunder {
   private domain = 'https://api-shoulei-ssl.xunlei.com'
+  private extract?: SubtitleDeps['extractAvNumber']
   private request: SubtitleDeps['request']
 
   constructor(deps: SubtitleDeps) {
     this.request = deps.request
+    this.extract = deps.extractAvNumber
   }
 
   /** 搜索字幕 */
@@ -73,16 +81,20 @@ export class Thunder {
       return []
 
     const results = await Promise.all(
-      data.data.map(async (item) => {
+      data.data.map(async (item): Promise<ProcessedThunder | null> => {
         try {
-          return {
+          const result: ProcessedThunder = {
             id: md5(item.gcid + item.cid),
             raw: await this.getSubtitleBlob(item.url),
             title: item.name,
             extraName: item.extra_name,
+            durationMs: item.duration,
             score: item.score,
+            fingerprintScore: item.fingerprintf_score,
             format: item.ext,
+            avNumber: this.extract?.(item.name) ?? undefined,
           }
+          return result
         }
         catch {
           return null

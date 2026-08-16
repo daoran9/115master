@@ -85,6 +85,8 @@ describe('subtitleSource.Thunder', () => {
 
     expect(result).toHaveLength(2)
     expect(result[0].score).toBe(95)
+    expect(result[0].durationMs).toBe(1000)
+    expect(result[0].fingerprintScore).toBe(90)
     expect(result[1].score).toBe(80)
     expect(result[0].format).toBe('ass')
     expect(result[0].title).toBe(' subtitle-b')

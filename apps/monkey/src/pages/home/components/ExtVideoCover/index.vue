@@ -1,13 +1,27 @@
 <template>
-  <div ref="rootRef" :class="styles.container.main">
-    <div :class="styles.container.content">
+  <div
+    ref="rootRef"
+    :class="[
+      props.variant === 'official'
+        ? videoCover.isReady
+          ? styles.container.officialMain
+          : styles.container.officialPending
+        : props.variant === 'official-panel'
+          ? styles.container.officialPanelMain
+          : styles.container.legacyMain,
+    ]"
+  >
+    <div
+      v-if="props.variant !== 'official' || videoCover.isReady"
+      :class="styles.container.content"
+    >
       <!-- 错误状态 -->
-      <div v-if="videoCover.error" :class="styles.states.error">
+      <div v-if="props.variant !== 'official' && videoCover.error" :class="styles.states.error">
         <LoadingError size="mini" :message="videoCover.error" />
       </div>
 
       <!-- 骨架屏 -->
-      <template v-else-if="videoCover.isLoading">
+      <template v-else-if="props.variant !== 'official' && videoCover.isLoading">
         <div :class="styles.skeleton" />
       </template>
 
@@ -36,6 +50,7 @@
 </template>
 
 <script setup lang="ts">
+import PhotoSwipe from 'photoswipe'
 import PhotoSwipeLightbox from 'photoswipe/lightbox'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { LoadingError } from '@/components'
@@ -43,12 +58,15 @@ import { useSmartVideoCover } from '@/hooks/useVideoCover'
 import { clsx } from '@/utils/clsx'
 import 'photoswipe/style.css'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   pickCode: string
   sha1: string
   duration: number | string
   listScrollBoxNode: HTMLElement
-}>()
+  variant?: 'legacy' | 'official' | 'official-panel'
+}>(), {
+  variant: 'legacy',
+})
 
 /** 文件列表视频封面数量 */
 const FILELIST_VIDEO_COVER_NUM = 5
@@ -57,7 +75,10 @@ const FILELIST_VIDEO_COVER_NUM = 5
 const styles = clsx({
   // 容器样式
   container: {
-    main: 'h-24 w-full max-w-214 px-20 [content-visibility:auto]',
+    legacyMain: 'h-24 w-full max-w-214 px-20 [content-visibility:auto]',
+    officialMain: 'h-24 w-full max-w-214 px-4 [content-visibility:auto]',
+    officialPanelMain: 'h-24 w-full max-w-214 px-4 [content-visibility:auto]',
+    officialPending: 'h-px overflow-hidden',
     content:
       'bg-base-300 relative flex h-full items-center overflow-hidden rounded',
   },
@@ -122,7 +143,7 @@ function initPhotoSwipe() {
       alt: '视频封面',
     })),
     showHideAnimationType: 'fade',
-    pswpModule: () => import('photoswipe'),
+    pswpModule: PhotoSwipe,
     mouseMovePan: true,
     initialZoomLevel: 'fit',
     secondaryZoomLevel: 2,

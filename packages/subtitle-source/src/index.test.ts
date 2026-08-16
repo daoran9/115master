@@ -6,5 +6,7 @@ describe('subtitle package exports', () => {
     expect(subtitle.subtitleSource).toBeDefined()
     expect(subtitle.subtitleSource.Thunder).toBeDefined()
     expect(subtitle.subtitleSource.SubtitleCat).toBeDefined()
+    expect(subtitle.subtitleSource.AvSubtitles).toBeDefined()
+    expect(subtitle.subtitleSource.Aiyi).toBeDefined()
   })
 })

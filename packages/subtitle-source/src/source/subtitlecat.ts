@@ -1,6 +1,7 @@
 import type { ProcessedSubtitle } from '../cache.ts'
 import type { SubtitleDeps } from '../types.ts'
 import md5 from 'blueimp-md5'
+import { matchesAvNumber } from './av.ts'
 
 /**
  * subtitlecat 搜索结果
@@ -21,10 +22,12 @@ interface SubtitleSearchResult {
  */
 export class SubtitleCat {
   private domain = 'https://subtitlecat.com'
+  private extract?: SubtitleDeps['extractAvNumber']
   private request: SubtitleDeps['request']
 
   constructor(deps: SubtitleDeps) {
     this.request = deps.request
+    this.extract = deps.extractAvNumber
   }
 
   async getSubtitleBlob(url: string): Promise<Blob> {
@@ -50,7 +53,7 @@ export class SubtitleCat {
     if (!keyword)
       return []
 
-    const response = await this.request.get(`${this.domain}/index.php?search=${keyword}`)
+    const response = await this.request.get(`${this.domain}/index.php?search=${encodeURIComponent(keyword)}`)
     const parser = new DOMParser()
     const doc = parser.parseFromString(
       await response.text(),
@@ -60,11 +63,14 @@ export class SubtitleCat {
       doc.querySelectorAll('.sub-table tbody tr'),
     ).slice(0, 5)
 
+    const avNumber = this.extract?.(keyword) ?? undefined
     const searchResults = rows
       .map(row => this.parseSubtitleRow(row, language))
-      .filter(item =>
-        item.title.toLowerCase().includes(keyword.toLowerCase()),
-      )
+      .filter((item) => {
+        if (avNumber && this.extract)
+          return matchesAvNumber(item.title, avNumber, this.extract)
+        return item.title.toLowerCase().includes(keyword.toLowerCase())
+      })
 
     const processedResults = await Promise.all(
       searchResults.map(async item => this.processSubtitleItem(item)),
@@ -133,6 +139,8 @@ export class SubtitleCat {
       id: md5(JSON.stringify(item)),
       raw: blob,
       format: 'srt',
+      source: 'Subtitle Cat',
+      avNumber: this.extract?.(item.title) ?? undefined,
     } satisfies ProcessedSubtitle
   }
 

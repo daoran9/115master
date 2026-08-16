@@ -106,12 +106,12 @@ test.describe('FileListMod', () => {
     expect(errors).toEqual([])
   })
 
-  test('融合版默认恢复番号资料增强', async ({ page }) => {
+  test('融合版番号资料与视频预览默认共存', async ({ page }) => {
     const errors = watch(page)
     await setupHarness(page)
     await page.goto(HOME_URL)
 
-    // 注入带番号的视频项：默认加载番号资料，并由设置页运行时控制。
+    /** 注入带番号的视频项：详情和预览分别由各自设置开关控制。 */
     await replaceList(page, [
       { title: 'ABP-123 番号视频.mp4', iv: '1', file_type: '1', pick_code: 'avNumberPick', sha1: 'AVSHA1' },
     ])
@@ -119,7 +119,143 @@ test.describe('FileListMod', () => {
     await expect(video.locator('a.master-player')).toBeAttached()
     await expect(video).toHaveClass(/with-ext-info/)
     await expect(video.locator('.ext-info-root')).toBeAttached()
-    await expect(video).not.toHaveClass(/with-ext-video-cover/)
+    await expect(video).toHaveClass(/with-ext-video-cover/)
+    await expect(video.locator('.ext-video-cover-root')).toBeAttached()
+    expect(errors).toEqual([])
+  })
+
+  test('旧版大目录只挂载视口附近的视频预览', async ({ page }) => {
+    const errors = watch(page)
+    await setupHarness(page)
+    await page.goto(HOME_URL)
+
+    /*
+     * ================================================================================
+     * 步骤1：验证旧版大目录预览懒挂载
+     * ================================================================================
+     * 目标：开启预览时不同时创建数百个 Shadow DOM 和 Vue 应用。
+     * 数据源：300 条固定高度的视频文件行。
+     * 操作：
+     * 1) 限定列表视口并注入 300 条视频
+     * 2) 核对所有占位已建立，但仅视口附近挂载预览
+     * 3) 滚到底部后核对末行按需挂载
+     */
+    console.info('[e2e] 开始核对旧版大目录预览懒挂载')
+
+    await page.addStyleTag({
+      content: '.list-contents { height: 320px !important; overflow-y: auto !important; } .list-contents li { height: 64px !important; min-height: 64px !important; overflow: hidden !important; }',
+    })
+    const videos = Array.from({ length: 300 }, (_, index) => ({
+      title: `目录视频-${String(index + 1).padStart(3, '0')}.mp4`,
+      iv: '1' as const,
+      file_type: '1' as const,
+      pick_code: `largeVideo${index + 1}`,
+      sha1: String(index + 1).padStart(40, '0'),
+    }))
+    await replaceList(page, videos)
+
+    await expect(page.locator('[data-115master-preview]')).toHaveCount(300)
+    await expect.poll(() => page.locator('.ext-video-cover-root').count()).toBeLessThan(50)
+
+    const scroll = page.locator('.list-contents')
+    await scroll.evaluate(element => element.scrollTop = element.scrollHeight)
+    await expect(page.locator('li[pick_code="largeVideo300"] .ext-video-cover-root')).toBeAttached()
+
+    console.info('[e2e] 旧版大目录预览懒挂载核对完成')
+    expect(errors).toEqual([])
+  })
+
+  test('旧版停用 MyFans 详情并保留 FC2 番号详情', async ({ page }) => {
+    const errors = watch(page)
+    await setupHarness(page, {
+      mocks: api => api.override(/^https:\/\/115\.com\/\?/, ({ route, request }) => {
+        if (!request.isNavigationRequest())
+          return
+        return html(route, homeHtml({
+          paths: [
+            { title: '根目录', cid: '0' },
+            { title: 'fans', cid: '3' },
+          ],
+        }))
+      }),
+    })
+    await page.goto(HOME_URL)
+
+    /*
+     * ================================================================================
+     * 步骤1：核对旧版资料源边界
+     * ================================================================================
+     * 目标：MyFans 文件不再挂详情，FC2 文件继续挂载 FD2PPV 详情入口。
+     * 数据源：旧版 fans 目录中的 MyFans、描述型和 FC2 视频。
+     * 操作：
+     * 1) 注入三类视频
+     * 2) 核对 MyFans 隔离与 FC2 番号
+     */
+    console.info('[e2e] 开始核对旧版资料源边界')
+
+    /** 1.1 注入显式 MyFans、描述型和 FC2 视频。 */
+    await replaceList(page, [
+      { title: 'ティアくん(tiakun_404)曾担任女性杂志专属模特。^WM10.mp4', iv: '1', file_type: '1', pick_code: 'myFansVideo', sha1: 'MYFANSSHA1' },
+      { title: '75人目肉便器堕ち.restored.mp4', iv: '1', file_type: '1', pick_code: 'descriptionVideo', sha1: 'DESCRIPTIONSHA1' },
+      { title: 'FC2-PPV-4818259.mp4', iv: '1', file_type: '1', pick_code: 'fc2Video', sha1: 'FC2SHA1' },
+    ])
+
+    /** 1.2 MyFans 和描述型文件不挂详情，FC2 保留标准番号详情。 */
+    await expect(page.locator('li[pick_code="myFansVideo"] [data-115master-detail]')).toHaveCount(0)
+    await expect(page.locator('li[pick_code="descriptionVideo"] [data-115master-detail]')).toHaveCount(0)
+    await expect(page.locator('li[pick_code="fc2Video"] [data-115master-detail]'))
+      .toHaveAttribute('data-115master-av-number', 'FC2-PPV-4818259')
+
+    console.info('[e2e] 旧版资料源边界核对完成')
+    expect(errors).toEqual([])
+  })
+
+  test('旧版演员头像保持小尺寸且不会撑满文件列表', async ({ page }) => {
+    const errors = watch(page)
+    await setupHarness(page, {
+      mocks: (api) => {
+        api.override(/^https:\/\/fastly\.jsdelivr\.net\/gh\/gfriends\/gfriends[^/]*\/Filetree\.json/, ({ route }) =>
+          json(route, {
+            Content: {
+              faces: {
+                '一条みお.jpg': '一条みお.jpg?t=1',
+              },
+            },
+          }))
+      },
+    })
+    await page.goto(HOME_URL)
+
+    /*
+     * ================================================================================
+     * 步骤1：核对旧版演员头像尺寸约束
+     * ================================================================================
+     * 目标：避免原始大图覆盖或撑高多行文件列表。
+     * 数据源：旧版文件行、演员头像索引和头像节点计算样式。
+     * 操作：
+     * 1) 注入与演员名完全匹配的旧版文件夹行
+     * 2) 核对状态类归属、头像尺寸和文件行高度
+     */
+    console.info('[e2e] 开始核对旧版演员头像尺寸')
+
+    /** 1.1 注入与演员头像索引完全匹配的旧版文件行。 */
+    await replaceList(page, [
+      { title: '一条みお', iv: '0', file_type: '0', pick_code: '', sha1: '', cate_id: 'actress-folder' },
+    ])
+
+    /** 1.2 状态类属于文件行，头像保持 50 x 50，文件行不会被原图撑高。 */
+    const row = page.locator('li[title="一条みお"]')
+    const avatar = row.locator('[data-115master-actress]')
+    await expect(row).toHaveClass(/with-actress-info/)
+    await expect(avatar).toHaveCSS('width', '50px')
+    await expect(avatar).toHaveCSS('height', '50px')
+    await expect(avatar).toHaveCSS('border-radius', '50%')
+    await expect(avatar).toHaveCSS('object-fit', 'cover')
+    await expect.poll(async () => row.evaluate(element =>
+      element.getBoundingClientRect().height,
+    )).toBeLessThanOrEqual(120)
+
+    console.info('[e2e] 旧版演员头像尺寸核对完成')
     expect(errors).toEqual([])
   })
 })
@@ -216,7 +352,7 @@ test.describe('FileItemMod 交互', () => {
     expect(errors).toEqual([])
   })
 
-  test('文件夹下载按钮：提示暂不支持', async ({ page }) => {
+  test('文件夹下载按钮：非115Browser给出明确环境提示', async ({ page }) => {
     const errors = watch(page)
     const dialogs: string[] = []
     page.on('dialog', (dialog) => {
@@ -228,7 +364,7 @@ test.describe('FileItemMod 交互', () => {
 
     // 同上：空 a 标签不可见，直接派发 click
     await page.locator('li[title="动漫"] a[menu="download_dir_one"]').dispatchEvent('click')
-    await expect.poll(() => dialogs).toEqual(['当前未支持文件夹下载'])
+    await expect.poll(() => dialogs).toEqual(['文件夹下载需要 115Browser'])
     expect(errors).toEqual([])
   })
 })

@@ -6,6 +6,11 @@ import { GM_info } from '$'
 export const isMac = GM_info.userAgentData.platform.match(/mac/i)
 
 /**
+ * 是否是 Windows 平台
+ */
+export const isWindows = /Windows/i.test(navigator.userAgent)
+
+/**
  * 是否是 115 浏览器
  */
 export const is115Browser = navigator.userAgent.match(/115Browser/i)
