@@ -312,7 +312,18 @@ test.describe('播放器影片详情图片', () => {
         })
         api.override(/^https:\/\/www\.javbus\.com\/NMSL-045/, async ({ route }) => {
           await route.fulfill({
-            body: '<div class="container"><h3>NMSL-045</h3><div class="movie"><div class="info"><p><span class="header">識別碼:</span><span>NMSL-045</span></p></div></div></div>',
+            body: `
+              <div class="container">
+                <h3>NMSL-045 JavBus gfriends 头像回归</h3>
+                <div class="movie">
+                  <div class="info">
+                    <p><span class="header">識別碼:</span><span>NMSL-045</span></p>
+                    <p><span class="header">演員:</span></p>
+                    <ul><li><a href="/star/yuzu"><img src="https://images.e2e.local/javbus-yuzu.jpg" title="藤田ゆず"></a></li></ul>
+                  </div>
+                </div>
+              </div>
+            `,
             contentType: 'text/html; charset=utf-8',
             headers: CORS,
           })
@@ -320,7 +331,18 @@ test.describe('播放器影片详情图片', () => {
         })
         api.override(/^https:\/\/www\.javlibrary\.com\/cn\/vl_searchbyid\.php/, async ({ route }) => {
           await route.fulfill({
-            body: '<html><head><title>NMSL-045 - JAVLibrary</title></head><body><div id="video_title">NMSL-045</div><div id="video_info"><div id="video_id"><span class="text">NMSL-045</span></div></div></body></html>',
+            body: `
+              <html>
+                <head><title>NMSL-045 JavLibrary gfriends 头像回归 - JAVLibrary</title></head>
+                <body>
+                  <div id="video_title"><h3>NMSL-045 JavLibrary gfriends 头像回归</h3></div>
+                  <div id="video_info">
+                    <div id="video_id"><span class="text">NMSL-045</span></div>
+                    <div id="video_cast"><span class="cast"><span class="star"><a href="vl_star.php?s=yuzu">藤田ゆず</a></span></span></div>
+                  </div>
+                </body>
+              </html>
+            `,
             contentType: 'text/html; charset=utf-8',
             headers: CORS,
           })
@@ -363,25 +385,33 @@ test.describe('播放器影片详情图片', () => {
 
     /*
      * ================================================================================
-     * 步骤1：验证文件列表头像库回退
+     * 步骤1：验证 gfriends 头像主选
      * ================================================================================
      * 目标：JavDB 头像可用时，播放器仍先显示 gfriends 已收录头像。
-     * 数据源：可用的 JavDB 头像和 gfriends 藤田ゆず记录。
+     * 数据源：三个资料源的藤田ゆず记录和 gfriends 主选头像。
      * 操作：
      * 1) 等待演员名触发 gfriends 主选加载
-     * 2) 核对 Blob 图片、主选地址和 gfriends 内容请求
+     * 2) 循环切换三个资料源，核对头像始终来自 gfriends
+     * 3) 确认 gfriends 命中后没有发出 MissAV 请求
      */
-    console.info('[e2e] 开始核对 gfriends 演员头像回退')
+    console.info('[e2e] 开始核对 gfriends 演员头像主选')
 
     await expect(page.getByText('NMSL-045 gfriends 头像回归', { exact: true })).toBeVisible()
     const actor = page.locator('img[alt="藤田ゆず"]')
     await expect(actor).toHaveAttribute('src', /^blob:/)
     await expect(actor).toHaveAttribute('data-origin-src', /gfriends\/gfriends@latest\/Content\/7-Moodyz\//)
+    for (const source of ['JavBus', 'JavLibrary', 'JavDB']) {
+      // 1.1 每个资料标签都必须保留同一个 gfriends 主选头像。
+      await page.locator('a.tab', { hasText: source }).click()
+      await expect(page.locator('a.tab-active')).toHaveText(source)
+      await expect(actor).toHaveAttribute('data-origin-src', /gfriends\/gfriends@latest\/Content\/7-Moodyz\//)
+    }
     const requests = await gmRequests(page)
     expect(requests.some(request => request.url.includes('gfriends/gfriends@latest/Content/7-Moodyz/')))
       .toBe(true)
+    expect(requests.some(request => request.url.includes('missav.ws'))).toBe(false)
 
-    console.info('[e2e] gfriends 演员头像回退核对完成')
+    console.info('[e2e] gfriends 演员头像主选核对完成')
     expect(errors).toEqual([])
   })
 })
