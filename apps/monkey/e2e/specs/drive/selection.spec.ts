@@ -101,18 +101,20 @@ test.describe('选择与操作', () => {
       expect(radius).toBeGreaterThanOrEqual(geometry.height / 2)
     await expect(row(page, '演示视频 01.mp4')).toHaveAttribute('data-checked', 'true')
 
-    /** ActionBar 出现：置顶/星标/打标签/移动/重命名/删除（根目录无「提到上级」） */
+    /** ActionBar 出现：单视频含 ED2K，根目录无「提到上级」 */
     await expect(page.getByRole('button', { name: '置顶', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '星标', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '打标签' })).toBeVisible()
     await expect(page.getByRole('button', { name: '移动' })).toBeVisible()
     await expect(page.getByRole('button', { name: '重命名' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '生成 ED2K 链' })).toBeVisible()
     await expect(page.getByRole('button', { name: '删除' })).toBeVisible()
     await expect(page.getByRole('button', { name: '提到上级' })).toHaveCount(0)
 
     /** 再勾一项 → 「2 项」 */
     await check(page, '演示视频 02.mp4')
     await expect(exit).toContainText('2 项')
+    await expect(page.getByRole('button', { name: '生成 ED2K 链' })).toHaveCount(0)
 
     /** 退出多选 → 普通顶栏恢复（排序按钮再现）、ActionBar 消失 */
     await exit.click()
@@ -142,9 +144,9 @@ test.describe('选择与操作', () => {
     /** 右键 radio 选中该项 → 多选态计数 1 */
     await expect(page.getByTitle('退出多选')).toContainText('1 项')
 
-    /** 菜单项与 actionConfig 一致（根目录无「提到上级」） */
+    /** 菜单项与 actionConfig 一致（单视频含 ED2K，根目录无「提到上级」） */
     const items = menu(page).getByRole('menuitem')
-    await expect(items).toHaveText(['置顶', '星标', '打标签', '移动', '重命名', '删除'])
+    await expect(items).toHaveText(['置顶', '星标', '打标签', '移动', '重命名', '生成 ED2K 链', '删除'])
 
     expect(errors).toEqual([])
   })
@@ -158,7 +160,7 @@ test.describe('选择与操作', () => {
 
     await row(page, '动漫 第01话.mp4').click({ button: 'right' })
     const items = menu(page).getByRole('menuitem')
-    await expect(items).toHaveText(['置顶', '星标', '打标签', '移动', '提到上级', '重命名', '删除'])
+    await expect(items).toHaveText(['置顶', '星标', '打标签', '移动', '提到上级', '重命名', '生成 ED2K 链', '删除'])
 
     expect(errors).toEqual([])
   })

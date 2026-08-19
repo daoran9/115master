@@ -108,6 +108,11 @@ const Drive = defineComponent({
       batchTag: async () => {
         await action.tagBatch(store.selection.values)
       },
+      ed2k: async () => {
+        const item = store.selection.values[0]
+        if (item?.fc === 1)
+          await action.ed2k(item)
+      },
     }
 
     const actionAtom = {
@@ -157,6 +162,16 @@ const Drive = defineComponent({
         icon: I.TAG,
         onClick: () => actionHandlers.batchTag(),
       },
+      ed2k: {
+        name: 'ed2k',
+        label: '生成 ED2K 链',
+        icon: I.ADD_LINK,
+        show: computed(() => {
+          const item = store.selection.values[0]
+          return store.selection.count === 1 && item?.fc === 1 && item.iv === 1
+        }),
+        onClick: () => actionHandlers.ed2k(),
+      },
       delete: {
         name: 'delete',
         icon: I.DELETE,
@@ -167,7 +182,7 @@ const Drive = defineComponent({
 
     const actionConfig = computed<Action[][]>(() => [
       [actionAtom.top, actionAtom.star, actionAtom.tag],
-      [actionAtom.move, actionAtom.improve, actionAtom.rename],
+      [actionAtom.move, actionAtom.improve, actionAtom.rename, actionAtom.ed2k],
       [actionAtom.delete],
     ])
 

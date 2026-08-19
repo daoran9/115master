@@ -110,6 +110,7 @@ export default defineConfig({
           'cpats01.115.com',
           'dl.115cdn.net',
           'cdnfhnfile.115cdn.net',
+          '*.115cdn.net',
           'fhnfile.oss-cn-shenzhen.aliyuncs.com',
           '*.oss-cn-shenzhen.aliyuncs.com',
           'v.anxia.com',

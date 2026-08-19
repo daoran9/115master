@@ -1,5 +1,6 @@
 import { useCloudDownloadAction } from './useCloudDownloadAction'
 import { useDeleteAction } from './useDeleteAction'
+import { useEd2kAction } from './useEd2kAction'
 import { useFileAction } from './useFileAction'
 import { useMoveAction } from './useMoveAction'
 import { useTagAction } from './useTagAction'
@@ -10,6 +11,7 @@ export function useDriveAction() {
   const { moveBatch, dragMove, improve } = useMoveAction()
   const { deleteBatch } = useDeleteAction()
   const { cloudDownload } = useCloudDownloadAction()
+  const { ed2k } = useEd2kAction()
   const { tagBatch } = useTagAction()
 
   return {
@@ -22,6 +24,7 @@ export function useDriveAction() {
     renameItem,
     newFolder,
     cloudDownload,
+    ed2k,
     tagBatch,
   }
 }
