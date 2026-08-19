@@ -1,7 +1,7 @@
 {
   "name": "@115master/monkey",
   "type": "module",
-  "version": "2.0.0-beta.83",
+  "version": "2.0.0-beta.84",
   "private": true,
   "packageManager": "pnpm@9.15.9",
   "description": "115网盘增强脚本 | 新旧功能融合版",

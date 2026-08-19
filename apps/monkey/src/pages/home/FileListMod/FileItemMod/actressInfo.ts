@@ -45,11 +45,11 @@ export class FileItemModActressInfo extends FileItemModBase {
      * ================================================================================
      * 步骤1：按页面形态约束演员头像
      * ================================================================================
-     * 目标：新旧页面统一复现旧版头像外观。
+     * 目标：新旧页面统一复现旧版头像外观和文件名旁挂载位置。
      * 数据源：文件项所属页面形态。
      * 操作：
      * 1) 固定为旧版 50×50 圆形头像
-     * 2) 新版只改变挂载容器，不改变头像外观
+     * 2) 新版列表把头像插到原生文件名前，详情面板仍使用独立容器
      */
     logger.info('开始设置演员头像显示模式')
 
@@ -63,23 +63,37 @@ export class FileItemModActressInfo extends FileItemModBase {
     actressDom.style.height = `${avatarSize}px`
     actressDom.style.minWidth = `${avatarSize}px`
     actressDom.style.maxWidth = `${avatarSize}px`
+    actressDom.style.minHeight = `${avatarSize}px`
+    actressDom.style.maxHeight = `${avatarSize}px`
     actressDom.style.flex = `0 0 ${avatarSize}px`
     actressDom.style.borderRadius = '50%'
     actressDom.style.objectFit = 'cover'
     logger.info('演员头像显示模式设置完成', isOfficialSurface ? 'official' : 'legacy')
+    const inlineName = isOfficialSurface && this.itemInfo.presentation !== 'panel'
+      ? this.itemInfo.interactionNode
+        ?.querySelector<HTMLElement>('.file-name-responsive') ?? null
+      : null
     const nameContainer = this.itemInfo.surface === 'official'
       ? this.itemInfo.presentation === 'panel'
         ? this.itemNode.closest('[data-115master-grid-panel]')
           ?.querySelector<HTMLElement>('[data-115master-grid-panel-header]')
           ?? this.itemNode
-        : this.itemNode
+        : inlineName?.parentElement ?? this.itemNode
       : this.itemNode.querySelector<HTMLElement>('.file-name-wrap')
         ?? this.itemNode.querySelector('.file-name-responsive')?.parentElement
     const styleContainer = this.itemInfo.surface === 'official'
       ? nameContainer
       : this.itemNode
     styleContainer?.classList.add('with-actress-info')
-    nameContainer?.prepend(actressDom)
+    if (inlineName) {
+      // 1.3 新版头像紧邻文件名，并在附加区保留重绘自检标记。
+      nameContainer?.setAttribute('data-115master-actress-host', '')
+      this.itemNode.setAttribute('data-115master-actress-inline', '')
+      inlineName.before(actressDom)
+    }
+    else {
+      nameContainer?.prepend(actressDom)
+    }
     this.actressDom = actressDom
     this.actressContainer = styleContainer ?? null
 
@@ -131,7 +145,9 @@ export class FileItemModActressInfo extends FileItemModBase {
     this.actressDom?.remove()
     this.actressDom = null
     this.actressContainer?.classList.remove('with-actress-info')
+    this.actressContainer?.removeAttribute('data-115master-actress-host')
     this.actressContainer = null
+    this.itemNode.removeAttribute('data-115master-actress-inline')
     if (this.objectUrl)
       URL.revokeObjectURL(this.objectUrl)
     this.objectUrl = null

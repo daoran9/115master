@@ -43,8 +43,6 @@
   box-sizing: border-box;
 }
 
-[data-115master-row-addon][data-115master-view='list'].with-actress-info,
-[data-115master-row-addon][data-115master-view='virtual-list'].with-actress-info,
 [data-115master-grid-panel-content].with-actress-info {
   display: flex;
   align-items: center;
@@ -57,16 +55,25 @@
  * ================================================================================
  * 步骤1：约束新版演员头像
  * ================================================================================
- * 目标：在 Fusion 附加区复现旧版头像外观。
- * 数据源：新版列表和网格详情层内的演员头像。
+ * 目标：在原生文件名旁和 Fusion 网格详情层复现旧版头像外观。
+ * 数据源：新版列表文件名容器和网格详情层内的演员头像。
  * 操作：
  * 1) 固定为旧版 50×50 尺寸
  * 2) 使用圆形和 cover，与旧版文件列表一致
  */
-[data-115master-row-addon] .actress-info-img,
+[data-115master-actress-host] {
+  display: flex;
+  align-items: center;
+}
+
+[data-115master-actress-host] > .actress-info-img,
 [data-115master-grid-panel] .actress-info-img {
   width: 50px;
   height: 50px;
+  min-width: 50px;
+  max-width: 50px;
+  min-height: 50px;
+  max-height: 50px;
   flex: 0 0 50px;
   border: 2px solid #e6eaf0;
   border-radius: 50%;

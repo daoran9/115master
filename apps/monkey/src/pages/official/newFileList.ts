@@ -59,6 +59,9 @@ const DETAIL_SELECTOR = '[data-115master-detail]'
 const PREVIEW_SELECTOR = '[data-115master-preview]'
 const ACTIONS_SELECTOR = '[data-115master-native-actions]'
 const ACTRESS_SELECTOR = '[data-115master-actress]'
+const ACTRESS_HOST_ATTRIBUTE = 'data-115master-actress-host'
+const ACTRESS_INLINE_ATTRIBUTE = 'data-115master-actress-inline'
+const ACTRESS_INLINE_SELECTOR = `[${ACTRESS_INLINE_ATTRIBUTE}]`
 const GRID_TOGGLE_SELECTOR = '[data-115master-grid-toggle]'
 const GRID_PANEL_SELECTOR = '[data-115master-grid-panel]'
 const DIAGNOSTIC_ATTRIBUTES = [
@@ -1057,6 +1060,12 @@ export class NewOfficialFileListMod {
       ACTRESS_SELECTOR,
       GRID_TOGGLE_SELECTOR,
     ].join(',')).forEach(node => node.remove())
+    row.querySelectorAll<HTMLElement>(`[${ACTRESS_HOST_ATTRIBUTE}]`).forEach((host) => {
+      host.classList.remove('with-actress-info')
+      host.removeAttribute(ACTRESS_HOST_ATTRIBUTE)
+    })
+    row.querySelectorAll<HTMLElement>(ACTRESS_INLINE_SELECTOR)
+      .forEach(node => node.removeAttribute(ACTRESS_INLINE_ATTRIBUTE))
     row.classList.remove(
       'with-ext-info',
       'with-ext-video-cover',
@@ -1101,11 +1110,21 @@ export class NewOfficialFileListMod {
       enhanced.addon.querySelectorAll<HTMLElement>(PREVIEW_SELECTOR),
     )
     const actions = enhanced.addon.querySelectorAll(ACTIONS_SELECTOR)
+    const addonActresses = enhanced.addon.querySelectorAll(ACTRESS_SELECTOR)
+    const inlineActresses = Array.from(
+      row.querySelectorAll<HTMLElement>(ACTRESS_SELECTOR),
+    ).filter(node => !enhanced.addon.contains(node))
+    const name = row.querySelector<HTMLElement>('.file-name-responsive')
+    const hasInlineActress = enhanced.addon.hasAttribute(ACTRESS_INLINE_ATTRIBUTE)
+    const inlineActressMatches = inlineActresses.length === 1
+      && inlineActresses[0]?.nextElementSibling === name
+    const inlineActressCurrent = hasInlineActress
+      ? inlineActressMatches
+      : inlineActresses.length === 0
     const legacy = Array.from(row.querySelectorAll<HTMLElement>([
       DETAIL_SELECTOR,
       PREVIEW_SELECTOR,
       ACTIONS_SELECTOR,
-      ACTRESS_SELECTOR,
     ].join(','))).filter(node => !enhanced.addon.contains(node))
     const expectsDetail = Boolean(
       userSettings.value.enableAvInfo
@@ -1124,6 +1143,8 @@ export class NewOfficialFileListMod {
       && enhanced.addon.getAttribute('data-115master-file-key')
       === getOfficialFileKey(item)
       && legacy.length === 0
+      && addonActresses.length === 0
+      && inlineActressCurrent
       && details.length === Number(expectsDetail)
       && previews.length === Number(expectsPreview)
       && actions.length === Number(expectsActions)

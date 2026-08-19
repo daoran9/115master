@@ -1,5 +1,11 @@
 # @115master/monkey
 
+## 2.0.0-beta.84
+
+### Patch Changes
+
+- 新版 115 列表的演员头像改为紧邻文件名显示，不再与下载入口一起落到 Fusion 附加行；React 重绘删除头像后会自动恢复。
+
 ## 2.0.0-beta.83
 
 ### Patch Changes

@@ -303,7 +303,7 @@ test.describe('新版 115 原生文件列表适配', () => {
       '__115masterOfficialFileCapture__' in window.fetch,
     )).toBe(false)
     expect(await page.locator('html').getAttribute('data-115master-official-file-list'))
-      .toBe('2.0.0-beta.83')
+      .toBe('2.0.0-beta.84')
 
     /**
      * ================================================================================
@@ -1191,7 +1191,7 @@ test.describe('新版 115 原生文件列表适配', () => {
     })
   })
 
-  test('新版演员头像只挂在 Fusion 附加区', async ({ page }) => {
+  test('新版演员头像紧邻原生文件名并在重绘后恢复', async ({ page }) => {
     const errors = watch(page)
     await setupHarness(page, {
       mocks: (api) => {
@@ -1227,27 +1227,40 @@ test.describe('新版 115 原生文件列表适配', () => {
 
     /**
      * ================================================================================
-     * 步骤1：验证新版演员头像隔离
+     * 步骤1：验证新版演员头像行内挂载
      * ================================================================================
-     * 目标：复现旧版演员头像，但不写入新版原生文件行。
-     * 数据源：本地头像数据库响应和 Fusion 附加区。
+     * 目标：复现旧版演员头像位置，同时保留独立 Fusion 附加区。
+     * 数据源：本地头像数据库响应、新版文件名节点和 Fusion 附加区。
      * 操作：
      * 1) 等待 SORA 头像索引完成
-     * 2) 核对头像节点归属和原生行洁净
+     * 2) 核对头像紧邻文件名且不进入附加区
+     * 3) 模拟 React 删除头像并核对自动恢复
      */
+    const row = page.locator('.file-list-item[data-file-id="official-file-1"]')
     const sora = page.locator('[data-115master-row-addon][data-115master-name="SORA-636.mp4"]')
-    const avatar = sora.locator('[data-115master-actress]')
+    const avatar = row.locator('[data-115master-actress]')
     await expect(avatar).toHaveCount(1)
     await expect(avatar).toHaveAttribute('alt', 'SORA-636.mp4.jpg?t=1')
     await expect(avatar).toHaveCSS('width', '50px')
     await expect(avatar).toHaveCSS('height', '50px')
     await expect(avatar).toHaveCSS('border-radius', '50%')
     await expect(avatar).toHaveCSS('object-fit', 'cover')
-    await expect(avatar.locator('xpath=..')).toHaveAttribute('class', /with-actress-info/)
+    await expect(avatar.locator('xpath=..')).toHaveAttribute('data-115master-actress-host', '')
+    await expect(sora.locator('[data-115master-actress]')).toHaveCount(0)
+    expect(await row.evaluate(element =>
+      element.querySelector('[data-115master-actress]')?.nextElementSibling
+      === element.querySelector('.file-name-responsive'),
+    )).toBe(true)
     await expect.poll(async () => sora.evaluate(element =>
       element.getBoundingClientRect().height,
-    )).toBeLessThanOrEqual(72)
-    await expect(page.locator('.file-list-item[data-file-id="official-file-1"] > .file-list-item > .flex.items-center [data-115master-actress]')).toHaveCount(0)
+    )).toBeLessThan(50)
+
+    await avatar.evaluate(node => node.remove())
+    await expect(row.locator('[data-115master-actress]')).toHaveCount(1)
+    expect(await row.evaluate(element =>
+      element.querySelector('[data-115master-actress]')?.nextElementSibling
+      === element.querySelector('.file-name-responsive'),
+    )).toBe(true)
     expect(errors).toEqual([])
   })
 
