@@ -20,10 +20,10 @@ export type GenerateEd2kOptions = Omit<Ed2kOptions, 'request'>
  * 步骤1：生成 115 文件 ED2K 链
  * ============================================================================
  * 目标：让独立 Fusion 页和官方页复用同一条下载与计算链。
- * 数据源：文件名、pick code、文件大小和 115 临时下载地址。
+ * 数据源：文件名、pick code、文件大小和各下载槽独立的 115 临时地址。
  * 操作：
- * 1) 获取原文件临时地址
- * 2) 合并认证 Cookie
+ * 1) 为每个并发下载槽获取临时地址
+ * 2) 合并各自的认证 Cookie
  * 3) 分块读取并计算 ED2K
  */
 export async function generateEd2k(file: Ed2kFile, options: GenerateEd2kOptions = {}) {
@@ -37,16 +37,18 @@ export async function generateEd2k(file: Ed2kFile, options: GenerateEd2kOptions 
     total: file.size,
   })
 
-  // 1.1 获取 115 临时原文件地址
-  const download = await drive115.video.getFileDownloadUrl(file.pickCode)
-  const auth = download.url.auth_cookie
-
-  // 1.2 认证信息只交给当前 Range 请求，不写持久化存储
+  // 1.1 每个下载槽独立获取临时地址，避免并发连接争用同一个签名
   const link = await calculateEd2k({
-    cookie: auth ? `${auth.name}=${auth.value}` : undefined,
     name: file.name,
+    resolve: async () => {
+      const download = await drive115.video.getFileDownloadUrl(file.pickCode)
+      const auth = download.url.auth_cookie
+      return {
+        cookie: auth ? `${auth.name}=${auth.value}` : undefined,
+        url: download.url.url,
+      }
+    },
     size: file.size,
-    url: download.url.url,
   }, {
     ...options,
     request: new GMRequest(),
