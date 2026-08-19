@@ -12,6 +12,7 @@ import {
   MissAV,
 } from '@/utils/jav'
 import { appLogger } from '@/utils/logger'
+import { hasActorFace, normalizeActorName } from './actorFaces'
 
 const logger = appLogger.sub('DataMovieInfo')
 
@@ -64,9 +65,8 @@ export function useDataMovieInfo() {
   let gfriendsActorFaceLoadKey = ''
   let completedGfriendsActorFaceLoadKey = ''
   let gfriendsActorFaceLoad: Promise<void> | null = null
-  let missAVActorFaceLoadKey = ''
-  let completedMissAVActorFaceLoadKey = ''
-  let missAVActorFaceLoad: Promise<void> | null = null
+  const missAVActorFaceLoads = new Map<string, Promise<void>>()
+  const completedMissAVActorFaceLoadKeys = new Set<string>()
 
   const javDBState = useAsyncState(
     async (avNumber?: string) => {
@@ -215,6 +215,10 @@ export function useDataMovieInfo() {
         if (loadVersion !== dataVersion || gfriendsActorFaceLoadKey !== requestKey)
           return
         gfriendsActorFaces.value = actors
+        const actorNames = new Set(actors.map(actor => normalizeActorName(actor.name)))
+        missAVActorFaces.value = missAVActorFaces.value.filter(
+          actor => !actorNames.has(normalizeActorName(actor.name)),
+        )
         completedGfriendsActorFaceLoadKey = requestKey
       })
       .catch((error) => {
@@ -228,7 +232,7 @@ export function useDataMovieInfo() {
     return gfriendsActorFaceLoad
   }
 
-  const loadActorFaces = (): Promise<void> => {
+  const loadActorFaces = async (actorName: string): Promise<void> => {
     /*
      * ================================================================================
      * 步骤1：按需加载播放器演员头像
@@ -236,47 +240,59 @@ export function useDataMovieInfo() {
      * 目标：gfriends 和影片资料站头像全部失败后，使用 MissAV 最终兜底。
      * 数据源：当前播放番号、可见资料标签演员名和 MissAV。
      * 操作：
-     * 1) 汇总并去重当前演员名
-     * 2) 合并同一影片的重复失败请求并丢弃过期结果
+     * 1) 等待 gfriends 查询完成并阻止已命中演员进入 MissAV
+     * 2) 只查询当前失败演员并合并并发结果
      */
-    logger.info('开始按需加载播放器演员头像', currentAvNumber)
+    logger.info('开始按需加载播放器演员头像', currentAvNumber, actorName)
 
-    /** 1.1 只查询当前可见资料已经确认过的演员，不做热门榜模糊匹配。 */
-    const actorNames = sourceActorNames.value
-    if (!currentAvNumber || actorNames.length === 0) {
+    /** 1.1 当前失败节点没有演员或影片身份时不查询远程后备。 */
+    const name = actorName.trim()
+    if (!currentAvNumber || !name) {
       logger.info('播放器演员头像按需加载完成，无可查询演员')
-      return Promise.resolve()
+      return
     }
 
-    const requestKey = `${currentAvNumber}\u0000${actorNames.slice().sort().join('\u0000')}`
-    if (completedMissAVActorFaceLoadKey === requestKey) {
-      logger.info('播放器演员头像按需加载完成，已命中当前结果', currentAvNumber)
-      return Promise.resolve()
+    // 1.2 gfriends 有记录时不允许 MissAV 覆盖或替换该演员头像。
+    await preloadGfriendsActorFaces()
+    if (hasActorFace(name, gfriendsActorFaces.value)) {
+      logger.info('播放器演员头像按需加载完成，gfriends 已命中', currentAvNumber, name)
+      return
     }
-    if (missAVActorFaceLoad && missAVActorFaceLoadKey === requestKey) {
+
+    const avNumber = currentAvNumber
+    const requestKey = `${avNumber}\u0000${normalizeActorName(name)}`
+    if (completedMissAVActorFaceLoadKeys.has(requestKey)) {
+      logger.info('播放器演员头像按需加载完成，已命中当前结果', avNumber, name)
+      return
+    }
+    const activeLoad = missAVActorFaceLoads.get(requestKey)
+    if (activeLoad) {
       logger.info('播放器演员头像按需加载复用进行中请求', currentAvNumber)
-      return missAVActorFaceLoad
+      return activeLoad
     }
 
     const loadVersion = dataVersion
-    missAVActorFaceLoadKey = requestKey
-    missAVActorFaceLoad = missAV.getActorFacesByAvNumber(currentAvNumber, actorNames)
+    const load = missAV.getActorFacesByAvNumber(avNumber, [name])
       .then((actors) => {
-        /** 1.2 文件或演员集合已切换时不能把旧头像写回当前详情。 */
-        if (loadVersion !== dataVersion || missAVActorFaceLoadKey !== requestKey)
+        /** 1.3 文件已切换时不能把旧头像写回当前详情。 */
+        if (loadVersion !== dataVersion || currentAvNumber !== avNumber)
           return
-        missAVActorFaces.value = actors
-        completedMissAVActorFaceLoadKey = requestKey
+        const actorNames = new Set(actors.map(actor => normalizeActorName(actor.name)))
+        missAVActorFaces.value = [
+          ...missAVActorFaces.value.filter(actor => !actorNames.has(normalizeActorName(actor.name))),
+          ...actors,
+        ]
+        completedMissAVActorFaceLoadKeys.add(requestKey)
       })
       .catch((error) => {
-        logger.warn('播放器演员头像按需加载失败', currentAvNumber, error)
+        logger.warn('播放器演员头像按需加载失败', avNumber, name, error)
       })
       .finally(() => {
-        if (missAVActorFaceLoadKey === requestKey)
-          missAVActorFaceLoad = null
-        logger.info('播放器演员头像按需加载完成', currentAvNumber, missAVActorFaces.value.length)
+        missAVActorFaceLoads.delete(requestKey)
+        logger.info('播放器演员头像按需加载完成', avNumber, name, missAVActorFaces.value.length)
       })
-    return missAVActorFaceLoad
+    missAVActorFaceLoads.set(requestKey, load)
+    return load
   }
 
   watch(sourceActorNames, () => {
@@ -304,9 +320,8 @@ export function useDataMovieInfo() {
     gfriendsActorFaceLoadKey = ''
     completedGfriendsActorFaceLoadKey = ''
     gfriendsActorFaceLoad = null
-    missAVActorFaceLoadKey = ''
-    completedMissAVActorFaceLoadKey = ''
-    missAVActorFaceLoad = null
+    missAVActorFaceLoads.clear()
+    completedMissAVActorFaceLoadKeys.clear()
     javBusState.state.value = null
     javDBState.state.value = null
     javLibraryState.state.value = null

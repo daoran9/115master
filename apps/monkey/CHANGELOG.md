@@ -1,5 +1,11 @@
 # @115master/monkey
 
+## 2.0.0-beta.83
+
+### Patch Changes
+
+- 修复播放器切换影片资料标签后演员头像回落到 MissAV 的问题；补齐 gfriends CDN 请求权限，已命中 gfriends 的演员不再查询或采用 MissAV 头像，单个失败头像也只查询对应演员。
+
 ## 2.0.0-beta.82
 
 ### Patch Changes

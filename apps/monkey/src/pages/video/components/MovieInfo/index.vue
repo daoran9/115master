@@ -75,7 +75,7 @@
             >
               <div :class="styles.actors.avatarWrapper">
                 <div :class="styles.actors.avatarContainer">
-                  <Image :src="getActorImageSource(actor, movieInfo.state.value?.detailUrl)" :alt="actor.name" :loader="getActorLoader(actor, movieInfo.state.value?.detailUrl)" :fallback="getActorFallback(actor, movieInfo.state.value?.detailUrl)" class="aspect-square w-full rounded-full" fit="cover" @error="movieInfos.loadActorFaces()" />
+                  <Image :src="getActorImageSource(actor, movieInfo.state.value?.detailUrl)" :alt="actor.name" :loader="getActorLoader(actor, movieInfo.state.value?.detailUrl)" :fallback="getActorFallback(actor, movieInfo.state.value?.detailUrl)" class="aspect-square w-full rounded-full" fit="cover" @error="movieInfos.loadActorFaces(actor.name)" />
                 </div>
                 <span
                   v-if="actor.sex !== undefined"
@@ -97,7 +97,7 @@
             >
               <div :class="styles.actors.avatarWrapper">
                 <div :class="styles.actors.avatarContainer">
-                  <Image :src="getActorImageSource(actor, movieInfo.state.value?.detailUrl)" :alt="actor.name" :loader="getActorLoader(actor, movieInfo.state.value?.detailUrl)" :fallback="getActorFallback(actor, movieInfo.state.value?.detailUrl)" class="aspect-square w-full rounded-full" fit="cover" @error="movieInfos.loadActorFaces()" />
+                  <Image :src="getActorImageSource(actor, movieInfo.state.value?.detailUrl)" :alt="actor.name" :loader="getActorLoader(actor, movieInfo.state.value?.detailUrl)" :fallback="getActorFallback(actor, movieInfo.state.value?.detailUrl)" class="aspect-square w-full rounded-full" fit="cover" @error="movieInfos.loadActorFaces(actor.name)" />
                 </div>
                 <span
                   v-if="actor.sex !== undefined"
@@ -249,6 +249,7 @@ import { Image } from '@/components/Image'
 import { clsx } from '@/utils/clsx'
 import { createGMImageFallbackLoader } from '@/utils/imageLoader'
 import { appLogger } from '@/utils/logger'
+import { hasActorFace, normalizeActorName } from '../../data/actorFaces'
 import CopyButton from './components/CopyButton.vue'
 import 'photoswipe/style.css'
 
@@ -362,10 +363,12 @@ function getActorImageCandidates(actor: ActorImageData, detailUrl?: string) {
       actor: candidate,
       detailUrl: tab.state.state.value?.detailUrl,
     })))
-  const missAVActors = props.movieInfos.missAVActorFaces.value.map(candidate => ({
-    actor: candidate,
-    detailUrl: candidate.faceReferer,
-  }))
+  const missAVActors = hasActorFace(actor.name, props.movieInfos.gfriendsActorFaces.value)
+    ? []
+    : props.movieInfos.missAVActorFaces.value.map(candidate => ({
+        actor: candidate,
+        detailUrl: candidate.faceReferer,
+      }))
   const matchedActors = [
     ...gfriendsActors.filter(candidate => normalizeActorName(candidate.actor.name) === actorName),
     ...sourceActors.filter(candidate => normalizeActorName(candidate.actor.name) === actorName),
@@ -391,11 +394,6 @@ function getActorImageCandidates(actor: ActorImageData, detailUrl?: string) {
 
   logger.info('播放器演员头像来源合并完成', actor.name, candidates.length)
   return candidates
-}
-
-/** 统一演员姓名，避免来源间空格和全半角差异。 */
-function normalizeActorName(name: string) {
-  return name.normalize('NFKC').replace(/\s+/g, '').toLowerCase()
 }
 
 /** 排除来源站点返回的通用无图资源。 */

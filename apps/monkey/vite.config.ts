@@ -136,6 +136,7 @@ export default defineConfig({
           'xximgs.cc',
           'api-shoulei-ssl.xunlei.com',
           'subtitle.v.geilijiasu.com',
+          'fastly.jsdelivr.net',
         ],
         'resource': {
           icon: logoSvg,
