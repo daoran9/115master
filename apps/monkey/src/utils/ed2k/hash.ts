@@ -1,6 +1,6 @@
 /* eslint-disable jsdoc/convert-to-jsdoc-comments */
 import { Logger } from '@115master/shared'
-import { createMD4 } from 'hash-wasm'
+import { md4 } from './md4'
 
 export const ED2K_PART_SIZE = 9_728_000
 export const ED2K_EMPTY_HASH = '31D6CFE0D16AE931B73C59D7E0C089C0'
@@ -30,12 +30,10 @@ function bytes(hash: string) {
 export async function hashEd2kPart(data: Uint8Array) {
   logger.info('开始计算 ED2K 分块摘要', data.byteLength)
 
-  // 1.1 初始化并写入当前分块
-  const md4 = await createMD4()
-  md4.init().update(data)
+  // 1.1 使用不依赖 WebAssembly 的实现，兼容 115 页面 CSP
+  const hash = md4(data)
 
-  // 1.2 固化摘要，避免后续复用状态污染结果
-  const hash = (md4.digest('hex') as string).toUpperCase()
+  // 1.2 每个文件分块使用独立状态，避免后续计算污染结果
   logger.info('ED2K 分块摘要计算完成', data.byteLength)
   return hash
 }
