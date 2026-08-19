@@ -7,6 +7,7 @@ import ROUTE_MATCH from './constants/route.match'
 import HomePage from './pages/home/index'
 import { magnetPage, registerMagnetProtocolHandler } from './pages/magnet'
 import OfficialPage from './pages/official'
+import { installOfficialFileCapture } from './pages/official/fileData'
 import { javLibraryWorkerPage } from './pages/javLibraryWorker'
 import { videoTokenPage } from './pages/video'
 import { checkUserAgent } from './utils/checkUserAgent'
@@ -32,6 +33,10 @@ debugInfo.bootstrapInfo()
 
 /** 检查用户代理 */
 checkUserAgent()
+
+/** 新版文件接口必须在页面应用首个 fetch 前开始捕获。 */
+if (window.top === window.self && window.location.hostname === '115.com')
+  installOfficialFileCapture()
 
 /** 路由匹配 */
 const routeMatch = [

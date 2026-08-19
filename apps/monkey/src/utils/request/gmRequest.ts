@@ -64,6 +64,7 @@ export class GMRequest implements IRequest {
     return new Promise((resolve, reject) => {
       const signal = options.signal
       let settled = false
+      let validated = false
       let request: ReturnType<typeof GM_xmlhttpRequest> | undefined
 
       function cleanup() {
@@ -83,6 +84,37 @@ export class GMRequest implements IRequest {
         fail(signal?.reason ?? new DOMException('请求已取消', 'AbortError'))
       }
 
+      const validate = (rawResponse: {
+        readyState: number
+        responseHeaders: string
+        status: number
+        statusText: string
+      }) => {
+        if (
+          !options.validateResponse
+          || validated
+          || rawResponse.readyState < 2
+          || rawResponse.status === 0
+        ) {
+          return
+        }
+
+        validated = true
+        const headers = new Headers()
+        Object.entries(this.parseResponseHeaders(rawResponse.responseHeaders))
+          .forEach(([key, value]) => headers.append(key, value))
+        options.validateResponse({
+          headers,
+          status: rawResponse.status,
+          statusText: rawResponse.statusText,
+        })
+      }
+
+      const stop = (error: unknown) => {
+        fail(error)
+        request?.abort()
+      }
+
       if (signal?.aborted) {
         handleAbort()
         return
@@ -100,8 +132,50 @@ export class GMRequest implements IRequest {
         redirect,
         cookie: options.cookie,
         cookiePartition: options.cookiePartition,
+        onreadystatechange: options.validateResponse
+          ? (rawResponse) => {
+              try {
+                validate(rawResponse)
+              }
+              catch (error) {
+                stop(error)
+              }
+            }
+          : undefined,
+        onprogress: (
+          options.validateResponse
+          || options.onProgress
+          || options.maxResponseBytes !== undefined
+        )
+          ? (event) => {
+              try {
+                validate(event)
+                const total = event.totalSize || event.total || 0
+                if (
+                  options.maxResponseBytes !== undefined
+                  && (event.loaded > options.maxResponseBytes
+                    || (event.lengthComputable && total > options.maxResponseBytes))
+                ) {
+                  throw new InfraError(
+                    '响应体超过允许的分块大小，已停止读取',
+                    requestUrl,
+                    event.status,
+                  )
+                }
+                options.onProgress?.({
+                  lengthComputable: event.lengthComputable,
+                  loaded: event.loaded,
+                  total,
+                })
+              }
+              catch (error) {
+                stop(error)
+              }
+            }
+          : undefined,
         onload: async (rawResponse) => {
           try {
+            validate(rawResponse)
             /** 解析响应头 */
             const headers = this.parseResponseHeaders(
               rawResponse.responseHeaders,
@@ -118,6 +192,18 @@ export class GMRequest implements IRequest {
               statusText: rawResponse.statusText,
               headers: responseHeaders,
             })
+
+            if (
+              options.maxResponseBytes !== undefined
+              && rawResponse.response instanceof ArrayBuffer
+              && rawResponse.response.byteLength > options.maxResponseBytes
+            ) {
+              throw new InfraError(
+                '响应体超过允许的分块大小，已停止读取',
+                requestUrl,
+                rawResponse.status,
+              )
+            }
 
             // 如果启用缓存，将响应存入缓存
             if (useCache)

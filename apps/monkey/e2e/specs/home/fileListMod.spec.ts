@@ -14,16 +14,25 @@ test.describe('FileListMod', () => {
     await setupHarness(page)
     await page.goto(HOME_URL)
 
-    // 40 个视频项注入 Master / 官方播放按钮（FileItemModExtMenu）
+    // 40 个视频项注入 Master / 官方播放 / ED2K 按钮（FileItemModExtMenu）
     // 注：类名 115-player 以数字开头，须用属性选择器
     await expect(page.locator('a.master-player')).toHaveCount(40)
     await expect(page.locator('a[class="115-player"]')).toHaveCount(40)
+    await expect(page.locator('a.ed2k-link')).toHaveCount(40)
     const masterBtn = page.locator('li[iv="1"] a.master-player').first()
     await expect(masterBtn).toHaveAttribute('title', '使用【Master播放器】')
     await expect(masterBtn).toHaveText('Master 播放')
     const officialBtn = page.locator('li[iv="1"] a[class="115-player"]').first()
     await expect(officialBtn).toHaveAttribute('title', '使用【115官方播放器】')
     await expect(officialBtn).toHaveText('官方播放')
+    const ed2kBtn = page.locator('li[iv="1"] a.ed2k-link').first()
+    await expect(ed2kBtn).toHaveAttribute('title', '生成 ED2K 链')
+    await expect(ed2kBtn).toHaveText('ED2K')
+    await ed2kBtn.click()
+    const ed2kDialog = page.locator('[data-115master-ed2k-dialog]')
+    await expect(ed2kDialog.locator('.name')).toHaveText('演示视频 01.mp4')
+    await ed2kDialog.locator('button.cancel').click()
+    await expect(ed2kDialog).toHaveCount(0)
 
     // 视频项注入封面容器（FileItemModVideoCover）：li 加类 + shadow 挂载点跟随主题
     await expect(page.locator('li.with-ext-video-cover')).toHaveCount(40)
@@ -99,6 +108,7 @@ test.describe('FileListMod', () => {
     // extMenu / videoCover 在 grid 下跳过
     await expect(page.locator('li[title="动漫"]')).toBeAttached()
     await expect(page.locator('a.master-player')).toHaveCount(0)
+    await expect(page.locator('a.ed2k-link')).toHaveCount(0)
     await expect(page.locator('li.with-ext-video-cover')).toHaveCount(0)
     // folderLink 不受视图模式限制
     await expect(page.locator('li[title="动漫"] .file-name a'))

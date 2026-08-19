@@ -4,6 +4,7 @@ import { Share } from '@115master/drive115'
 import iinaIcon from '@/assets/icons/iina-icon.png'
 import { FileListType, IvType } from '@/pages/home/types'
 import { drive115 } from '@/utils/drive115Instance'
+import { openEd2kDialog } from '@/utils/ed2k/browserDialog'
 import { isMac } from '@/utils/platform'
 import { goToPlayer } from '@/utils/route'
 import { webLinkIINA } from '@/utils/weblink'
@@ -87,6 +88,21 @@ export class FileItemModExtMenu extends FileItemModBase {
           )
         },
       },
+      {
+        class: 'ed2k-link',
+        title: '生成 ED2K 链',
+        text: 'ED2K',
+        visible: this.itemInfo.attributes.iv === IvType.Yes
+          && Number.isSafeInteger(Number(this.itemInfo.attributes.file_size))
+          && Number(this.itemInfo.attributes.file_size) >= 0,
+        click: () => {
+          void openEd2kDialog({
+            name: this.itemInfo.attributes.title,
+            pickCode: this.itemInfo.attributes.pick_code,
+            size: Number(this.itemInfo.attributes.file_size),
+          })
+        },
+      },
     ]
   }
 
@@ -122,7 +138,7 @@ export class FileItemModExtMenu extends FileItemModBase {
       const link = this.createNormalItemButtonElement(button)
       this.fileOprNode?.prepend(link)
       this.createdLinks.push(link)
-      link.addEventListener('mousedown', async (e: MouseEvent) => {
+      link.addEventListener('click', (e: MouseEvent) => {
         e.preventDefault()
         e.stopPropagation()
         e.stopImmediatePropagation()

@@ -69,7 +69,12 @@ test.describe('ED2K 链', () => {
     )
     const requests = await gmRequests(page)
     expect(requests.filter(request => request.url === FILE_URL)).toEqual([
-      expect.objectContaining({ headers: expect.objectContaining({ Range: 'bytes=0-2' }) }),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Range': 'bytes=0-2',
+          'User-Agent': expect.any(String),
+        }),
+      }),
     ])
     expect(errors).toEqual([])
     logger.info('离线 ED2K 生成链验证完成')
@@ -154,11 +159,12 @@ test.describe('ED2K 链', () => {
     // 3.1 确认 Range 请求已经发出，避免只覆盖计算前取消
     await row(page, item.n).click({ button: 'right' })
     await menu(page).getByRole('menuitem', { name: '生成 ED2K 链' }).click()
+    const progress = page.getByRole('dialog', { name: '生成 ED2K 链' })
     await expect.poll(async () => (await gmRequests(page)).some(request => request.url === FILE_URL))
       .toBe(true)
+    await expect(progress).toContainText('正在读取文件')
 
     // 3.3 取消关闭进度弹窗，完成态和错误态均不应出现
-    const progress = page.getByRole('dialog', { name: '生成 ED2K 链' })
     await progress.getByRole('button', { name: '取消' }).click()
     await expect(progress).toHaveCount(0)
     await page.waitForTimeout(1_100)
@@ -166,5 +172,61 @@ test.describe('ED2K 链', () => {
     await expect(page.getByRole('dialog', { name: 'ED2K 生成失败' })).toHaveCount(0)
     expect(errors).toEqual([])
     logger.info('ED2K 进行中取消验证完成')
+  })
+
+  /**
+   * ============================================================================
+   * 步骤4：验证 Worker 静默失败回退
+   * ============================================================================
+   * 目标：Worker 未返回 message 或 error 时仍由页面完成分块摘要。
+   * 数据源：不响应 postMessage 的 Worker 桩和 Range 206 字节 abc。
+   * 操作：
+   * 1) 等待启动握手超时
+   * 2) 核对主线程回退生成的标准链接
+   */
+  test('falls back when the worker does not respond', async ({ page }) => {
+    await page.addInitScript(() => {
+      class SilentWorker extends EventTarget {
+        postMessage() {}
+        terminate() {}
+      }
+      Object.defineProperty(window, 'Worker', {
+        configurable: true,
+        value: SilentWorker as unknown as typeof Worker,
+      })
+    })
+    const errors = watch(page)
+    const item = fixture('Worker 回退.mp4')
+    await boot(page, {
+      mocks: (api) => {
+        api.override(FILES_RE, ({ route }) => json(route, files(item)))
+        api.override(DOWNLOAD_RE, ({ route }) => json(route, { state: true, file_url: FILE_URL }))
+        api.override(SOURCE_RE, async ({ route }) => {
+          await route.fulfill({
+            status: 206,
+            headers: {
+              ...CORS,
+              'access-control-expose-headers': 'Content-Range',
+              'content-range': 'bytes 0-2/3',
+            },
+            body: 'abc',
+          })
+          return true
+        })
+      },
+    })
+    logger.info('开始验证 ED2K Worker 静默失败回退')
+
+    // 4.1 触发生成并等待 Worker 启动超时后的页面计算
+    await row(page, item.n).click({ button: 'right' })
+    await menu(page).getByRole('menuitem', { name: '生成 ED2K 链' }).click()
+
+    // 4.2 回退结果必须与 Worker 正常路径使用相同 MD4 摘要
+    const result = page.getByRole('dialog', { name: 'ED2K 链已生成' })
+    await expect(result.getByRole('textbox', { name: 'ED2K 链' })).toHaveValue(
+      'ed2k://|file|Worker 回退.mp4|3|A448017AAF21D8525FC10AE87AA6729D|/',
+    )
+    expect(errors).toEqual([])
+    logger.info('ED2K Worker 静默失败回退验证完成')
   })
 })

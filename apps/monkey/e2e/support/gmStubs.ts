@@ -94,6 +94,17 @@ export function gmInit(values?: Record<string, unknown>) {
           clearTimeout(timer)
         const headerLines = []
         res.headers.forEach((v, k) => headerLines.push(k + ': ' + v))
+        const responseHeaders = headerLines.join('\\n')
+        details.onreadystatechange?.({
+          status: res.status,
+          statusText: res.statusText,
+          responseHeaders,
+          response: null,
+          responseText: '',
+          responseXML: null,
+          readyState: 2,
+          finalUrl: res.url,
+        })
         let response
         if (details.responseType === 'json')
           response = await res.json()
@@ -103,10 +114,31 @@ export function gmInit(values?: Record<string, unknown>) {
           response = await res.arrayBuffer()
         else
           response = await res.text()
+        const loaded = response instanceof ArrayBuffer
+          ? response.byteLength
+          : typeof response === 'string'
+            ? new TextEncoder().encode(response).byteLength
+            : 0
+        details.onprogress?.({
+          status: res.status,
+          statusText: res.statusText,
+          responseHeaders,
+          response,
+          responseText: typeof response === 'string' ? response : '',
+          responseXML: null,
+          readyState: 3,
+          finalUrl: res.url,
+          done: loaded,
+          lengthComputable: true,
+          loaded,
+          position: loaded,
+          total: loaded,
+          totalSize: loaded,
+        })
         details.onload?.({
           status: res.status,
           statusText: res.statusText,
-          responseHeaders: headerLines.join('\\n'),
+          responseHeaders,
           response,
           responseText: typeof response === 'string' ? response : '',
           readyState: 4,

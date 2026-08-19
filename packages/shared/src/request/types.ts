@@ -19,6 +19,24 @@ export type RequestOptions = RequestInit & {
   cookiePartition?: {
     topLevelSite?: string
   }
+  /** Receive byte-level download progress from request implementations that support it. */
+  onProgress?: (progress: RequestProgress) => void
+  /** Reject a response as soon as its status and headers become available. */
+  validateResponse?: (response: RequestResponseHead) => void
+  /** Abort a response that exceeds the caller's bounded-memory contract. */
+  maxResponseBytes?: number
+}
+
+export interface RequestProgress {
+  lengthComputable: boolean
+  loaded: number
+  total: number
+}
+
+export interface RequestResponseHead {
+  headers: Headers
+  status: number
+  statusText: string
 }
 
 export type ResponseType = Response

@@ -3,12 +3,23 @@ export interface Ed2kPartRequest {
   buffer: ArrayBuffer
 }
 
+export interface Ed2kPingRequest {
+  type: 'ping'
+}
+
 export interface Ed2kFinishRequest {
   type: 'finish'
   size: number
 }
 
-export type Ed2kWorkerRequest = Ed2kFinishRequest | Ed2kPartRequest
+export type Ed2kWorkerRequest
+  = | Ed2kFinishRequest
+    | Ed2kPartRequest
+    | Ed2kPingRequest
+
+export interface Ed2kReadyResponse {
+  type: 'ready'
+}
 
 export interface Ed2kPartResponse {
   type: 'part'
@@ -28,4 +39,5 @@ export interface Ed2kErrorResponse {
 export type Ed2kWorkerResponse
   = | Ed2kErrorResponse
     | Ed2kPartResponse
+    | Ed2kReadyResponse
     | Ed2kResultResponse

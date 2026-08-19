@@ -1,23 +1,33 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+const pageWindow = vi.hoisted(() => ({
+  fetch: vi.fn(),
+}))
+
 const testLogger = {
   info: vi.fn(),
   warn: vi.fn(),
 }
 
-vi.mock('$', () => ({ unsafeWindow: {} }))
+vi.mock('$', () => ({ unsafeWindow: pageWindow }))
 vi.mock('@/utils/logger', () => ({
   appLogger: {
     sub: () => testLogger,
   },
 }))
 
-const { OfficialFileDataStore, isOfficialFileListRequest } = await import('../fileData')
+const {
+  OfficialFileDataStore,
+  installOfficialFileCapture,
+  isOfficialFileListRequest,
+  officialFileData,
+} = await import('../fileData')
 
 describe('officialFileDataStore', () => {
   beforeEach(() => {
     testLogger.info.mockClear()
     testLogger.warn.mockClear()
+    officialFileData.clear()
   })
 
   it('按当前目录和同名序号匹配新版文件行', () => {
@@ -122,5 +132,42 @@ describe('officialFileDataStore', () => {
     expect(isOfficialFileListRequest('https://webapi.115.com/rb')).toBe(false)
 
     testLogger.info('新版文件接口白名单验证完成')
+  })
+
+  it('在页面 fetch 返回后立即索引新版文件数据', async () => {
+    /*
+     * ================================================================================
+     * 步骤1：验证新版页面 fetch 捕获
+     * ================================================================================
+     * 目标：document-start 安装后不漏掉页面应用首次文件列表响应。
+     * 数据源：页面原生 fetch 返回的 /files JSON。
+     * 操作：
+     * 1) 安装一次捕获器并发起页面请求
+     * 2) 等待响应副本写入共用文件仓库
+     */
+    testLogger.info('开始验证新版页面 fetch 捕获')
+
+    /** 1.1 原始响应仍交给页面，捕获器只解析 clone。 */
+    const response = new Response(JSON.stringify({
+      data: [{ n: '新版视频.mp4', fid: 'new-file', pc: 'new-pick', pid: '0' }],
+    }), {
+      headers: { 'content-type': 'application/json' },
+      status: 200,
+    })
+    Object.defineProperty(response, 'url', {
+      value: 'https://webapi.115.com/files?cid=0',
+    })
+    pageWindow.fetch.mockResolvedValue(response)
+    installOfficialFileCapture()
+
+    /** 1.2 页面拿到同一响应后，异步副本必须进入当前目录索引。 */
+    await expect(
+      pageWindow.fetch('https://webapi.115.com/files?cid=0'),
+    ).resolves.toBe(response)
+    await vi.waitFor(() => {
+      expect(officialFileData.findByName('新版视频.mp4', '0')?.pc).toBe('new-pick')
+    })
+
+    testLogger.info('新版页面 fetch 捕获验证完成')
   })
 })

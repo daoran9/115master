@@ -194,6 +194,13 @@ test.describe('新版 115 原生文件列表适配', () => {
 
     const addons = page.locator('[data-115master-row-addon]')
     await expect(addons).toHaveCount(items.length)
+    const ed2k = addons.first().getByRole('link', { name: 'ED2K' })
+    await expect(ed2k).toBeVisible()
+    await ed2k.click()
+    const ed2kDialog = page.locator('[data-115master-ed2k-dialog]')
+    await expect(ed2kDialog.locator('.name')).toHaveText('SORA-636.mp4')
+    await ed2kDialog.locator('button.cancel').click()
+    await expect(ed2kDialog).toHaveCount(0)
     await page.evaluate(() => {
       window.requestAnimationFrame = () => 1
       window.cancelAnimationFrame = () => {}
@@ -298,10 +305,10 @@ test.describe('新版 115 原生文件列表适配', () => {
     await setupStorageHarness(page)
     await page.goto(OFFICIAL_STORAGE_URL)
 
-    /** 新版适配不得替换 115 页面原生 fetch。 */
+    /** 新版适配在 document-start 包装 fetch，以捕获首个文件列表响应。 */
     expect(await page.evaluate(() =>
       '__115masterOfficialFileCapture__' in window.fetch,
-    )).toBe(false)
+    )).toBe(true)
     expect(await page.locator('html').getAttribute('data-115master-official-file-list'))
       .toBe('2.0.0-beta.84')
 

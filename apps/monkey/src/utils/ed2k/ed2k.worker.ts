@@ -28,6 +28,13 @@ scope.onmessage = async (event: MessageEvent<Ed2kWorkerRequest>) => {
   logger.info('开始处理 ED2K Worker 消息', event.data.type)
 
   try {
+    // 1.1 启动握手用于识别脚本加载失败但未触发 error 的浏览器
+    if (event.data.type === 'ping') {
+      publish({ type: 'ready' })
+      logger.info('ED2K Worker 启动握手完成')
+      return
+    }
+
     // 1.1 分块数据只在 Worker 内参与计算，完成后释放原始字节
     if (event.data.type === 'part') {
       const hash = await hashEd2kPart(new Uint8Array(event.data.buffer))

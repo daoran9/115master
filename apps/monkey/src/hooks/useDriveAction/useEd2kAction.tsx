@@ -4,10 +4,8 @@ import type { Ed2kProgress } from '@/utils/ed2k'
 import { format } from '@115master/utils'
 import { ref } from 'vue'
 import { useAppDialog } from '@/app/dialog'
-import { drive115 } from '@/utils/drive115Instance'
-import { calculateEd2k } from '@/utils/ed2k'
+import { generateEd2k } from '@/utils/ed2k/generate'
 import { appLogger } from '@/utils/logger'
-import { GMRequest } from '@/utils/request/gmRequest'
 
 const logger = appLogger.sub('ED2KAction')
 
@@ -16,6 +14,17 @@ function percent(progress: Ed2kProgress) {
     ? 100
     : Math.round(progress.loaded / progress.total * 100)
 }
+
+function size(bytes: number) {
+  return bytes === 0 ? '0 B' : format.fileSize(bytes)
+}
+
+const stage = {
+  download: '正在读取文件',
+  finish: '正在生成链接',
+  hash: '正在计算分块摘要',
+  link: '正在获取下载地址',
+} satisfies Record<Ed2kProgress['stage'], string>
 
 /**
  * ============================================================================
@@ -35,7 +44,13 @@ export function useEd2kAction() {
     logger.info('开始生成视频 ED2K 链', item.pc, item.n)
 
     const controller = new AbortController()
-    const progress = ref<Ed2kProgress>({ loaded: 0, parts: 0, speed: 0, total: Number(item.s) })
+    const progress = ref<Ed2kProgress>({
+      loaded: 0,
+      parts: 0,
+      speed: 0,
+      stage: 'link',
+      total: Number(item.s),
+    })
     let settled = false
 
     // 1.1 进度弹窗只允许显式取消，防止误触背景中断长任务
@@ -50,6 +65,7 @@ export function useEd2kAction() {
       content: () => (
         <div class="space-y-4" data-ed2k-progress>
           <p class="text-base-content/80 text-sm break-all">{item.n}</p>
+          <p class="text-base-content/65 text-xs">{stage[progress.value.stage]}</p>
           <progress
             aria-label="ED2K 生成进度"
             class="progress progress-primary h-2 w-full"
@@ -58,10 +74,10 @@ export function useEd2kAction() {
           />
           <div class="text-base-content/65 flex justify-between gap-4 text-xs">
             <span>{`${percent(progress.value)}%`}</span>
-            <span>{`${format.fileSize(progress.value.speed)}/s`}</span>
+            <span>{progress.value.speed > 0 ? `${size(progress.value.speed)}/s` : '等待数据'}</span>
           </div>
           <p class="text-base-content/55 text-xs">
-            {`已读取 ${format.fileSize(progress.value.loaded)} / ${format.fileSize(progress.value.total)}`}
+            {`已读取 ${size(progress.value.loaded)} / ${size(progress.value.total)}`}
           </p>
         </div>
       ),
@@ -74,15 +90,11 @@ export function useEd2kAction() {
 
     try {
       // 1.2 获取临时原文件地址，并把认证 Cookie 交给 GM Range 请求
-      const download = await drive115.video.getFileDownloadUrl(item.pc)
-      const auth = download.url.auth_cookie
-      const link = await calculateEd2k({
-        cookie: auth ? `${auth.name}=${auth.value}` : undefined,
+      const link = await generateEd2k({
         name: item.n,
+        pickCode: item.pc,
         size: Number(item.s),
-        url: download.url.url,
       }, {
-        request: new GMRequest(),
         signal: controller.signal,
         onProgress: value => progress.value = value,
       })
