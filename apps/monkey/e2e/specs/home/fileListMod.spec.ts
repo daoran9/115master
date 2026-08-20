@@ -119,21 +119,47 @@ test.describe('FileListMod', () => {
     expect(errors).toEqual([])
   })
 
-  test('融合版番号资料与视频预览默认共存', async ({ page }) => {
+  test('融合版番号资料支持视频和 ISO 光盘镜像', async ({ page }) => {
     const errors = watch(page)
     await setupHarness(page)
     await page.goto(HOME_URL)
 
-    /** 注入带番号的视频项：详情和预览分别由各自设置开关控制。 */
+    /*
+     * ================================================================================
+     * 步骤1：验证视频和 ISO 番号资料
+     * ================================================================================
+     * 目标：番号 ISO 与视频能加载详情，软件 ISO 不产生误报。
+     * 数据源：带标准番号的 MP4、ISO 以及 Windows 光盘镜像。
+     * 操作：
+     * 1) 注入两种文件并等待增强加载
+     * 2) 核对详情容器与番号归属
+     */
+    logger.info('开始验证视频和 ISO 番号资料')
+
+    // 1.1 注入带番号的视频和 ISO 文件
     await replaceList(page, [
       { title: 'ABP-123 番号视频.mp4', iv: '1', file_type: '1', pick_code: 'avNumberPick', sha1: 'AVSHA1' },
+      { title: 'SORA-636.iso', iv: '1', file_type: '1', pick_code: 'isoPick', sha1: 'ISOSHA1' },
+      { title: 'zh-cn_windows_11_consumer.iso', iv: '1', file_type: '1', pick_code: 'windowsIsoPick', sha1: 'WINDOWSISOSHA1' },
     ])
     const video = page.locator('li[pick_code="avNumberPick"]')
+    const iso = page.locator('li[pick_code="isoPick"]')
+    const windows = page.locator('li[pick_code="windowsIsoPick"]')
+
+    // 1.2 两种文件都挂载各自的番号详情
     await expect(video.locator('a.master-player')).toBeAttached()
     await expect(video).toHaveClass(/with-ext-info/)
     await expect(video.locator('.ext-info-root')).toBeAttached()
     await expect(video).toHaveClass(/with-ext-video-cover/)
     await expect(video.locator('.ext-video-cover-root')).toBeAttached()
+    await expect(iso).toHaveClass(/with-ext-info/)
+    await expect(iso.locator('[data-115master-detail]'))
+      .toHaveAttribute('data-115master-av-number', 'SORA-636')
+    await expect(iso.locator('.ext-info-root')).toBeAttached()
+    await expect(windows).not.toHaveClass(/with-ext-info/)
+    await expect(windows.locator('[data-115master-detail]')).toHaveCount(0)
+
+    logger.info('视频和 ISO 番号资料验证完成')
     expect(errors).toEqual([])
   })
 

@@ -224,6 +224,63 @@ test.describe('新版 115 原生文件列表适配', () => {
     expect(errors).toEqual([])
   })
 
+  test('新版 ISO 光盘镜像按番号加载详情', async ({ page }) => {
+    /*
+     * ================================================================================
+     * 步骤1：验证新版 ISO 番号资料
+     * ================================================================================
+     * 目标：新版列表中的 ISO 文件不再被视频扩展名门禁过滤。
+     * 数据源：新版文件接口与原生行中的 SORA-636.iso。
+     * 操作：
+     * 1) 返回 ISO 文件并装配原生文件行
+     * 2) 核对附加区挂载 SORA-636 详情
+     */
+    console.info('[e2e] 开始验证新版 ISO 番号资料')
+    const errors = watch(page)
+    const iso = {
+      ...video('SORA-636.iso', '0'),
+      fid: 'official-iso-file',
+      pc: 'official-iso-pick',
+      sha: '8'.repeat(40),
+      s: 8589934592,
+      ico: 'iso',
+    }
+
+    // 1.1 用同一 ISO 文件生成原生页面和接口响应
+    await setupHarness(page, {
+      mocks: (api) => {
+        api.override(/^https:\/\/115\.com\/storage\/allfiles/, async ({ route, request }) => {
+          if (!request.isNavigationRequest())
+            return
+          await route.fulfill({
+            contentType: 'text/html; charset=utf-8',
+            headers: { ...CORS, 'origin-agent-cluster': '?0' },
+            body: storageHtml([iso]),
+          })
+          return true
+        })
+        api.override(FILES_RE, ({ route }) => json(route, filesRes({
+          cid: '0',
+          name: '根目录',
+          items: [iso],
+        }, 0, 1150)))
+        api.override(/^https:\/\/(www\.javbus\.com|www\.javlibrary\.com|javdb\.com|missav\.ws)\//, ({ route }) => {
+          return json(route, { state: false }, 404)
+        })
+      },
+    })
+    await page.goto(OFFICIAL_STORAGE_URL)
+
+    /** 1.2 ISO 附加区挂载精确番号详情 */
+    const addon = page.locator('[data-115master-row-addon][data-115master-file-key="official-iso-file"]')
+    await expect(addon).toHaveCount(1)
+    await expect(addon.locator('[data-115master-detail]'))
+      .toHaveAttribute('data-115master-av-number', 'SORA-636')
+    await expect(addon.locator('.ext-info-root')).toBeAttached()
+    expect(errors).toEqual([])
+    console.info('[e2e] 新版 ISO 番号资料验证完成')
+  })
+
   test('React 重绘为嵌套完整标题后自动恢复文件增强', async ({ page }) => {
     const errors = watch(page)
     await setupStorageHarness(page)

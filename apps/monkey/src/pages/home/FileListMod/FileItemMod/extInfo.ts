@@ -5,6 +5,7 @@ import ExtInfo from '@/pages/home/components/ExtInfo/index.vue'
 import { FileListType, FileType, IvType } from '@/pages/home/types'
 import mainStyles from '@/styles/main.css?inline'
 import { adoptShadowStyle } from '@/utils/adoptShadowStyle'
+import { normalizeAvNumber } from '@/utils/jav/jav'
 import { appLogger } from '@/utils/logger'
 import { FileItemModBase } from './base'
 import {
@@ -35,16 +36,34 @@ export class FileItemModExtInfo extends FileItemModBase {
       return
     }
 
-    // 只有带常见视频扩展名的可播放文件才加载详情。
+    /*
+     * ================================================================================
+     * 步骤1：核对番号详情文件类型
+     * ================================================================================
+     * 目标：视频文件保持原有规则，ISO 只在文件名主体就是番号时加载详情。
+     * 数据源：115 文件类型、文件名和已提取番号。
+     * 操作：
+     * 1) 识别常见视频扩展名
+     * 2) 规范化 ISO 文件名主体并与番号比较
+     */
+    logger.info('开始核对番号详情文件类型', avNumber ?? '', this.itemInfo.attributes.title)
+
+    /** 1.1 视频扩展名继续配合 115 iv 标记判定 */
+    const title = this.itemInfo.attributes.title
+    const video = /\.(?:3gp|avi|flv|m2ts|m4v|mkv|mov|mp4|mpeg|mpg|rm|rmvb|ts|vob|webm|wmv)$/i.test(title)
+
+    /** 1.2 ISO 只允许规范化后与已提取番号完全一致的文件名主体 */
+    const iso = /\.iso$/i.test(title)
+      && normalizeAvNumber(title.replace(/\.iso$/i, '')) === normalizeAvNumber(avNumber)
     if (
       this.itemInfo.attributes.iv !== IvType.Yes
       || this.itemInfo.attributes.file_type !== FileType.file
-      || !/\.(?:3gp|avi|flv|m2ts|m4v|mkv|mov|mp4|mpeg|mpg|rm|rmvb|ts|vob|webm|wmv)$/i.test(
-        this.itemInfo.attributes.title,
-      )
+      || (!video && !iso)
     ) {
+      logger.info('番号详情文件类型核对完成，跳过', avNumber ?? '', title)
       return
     }
+    logger.info('番号详情文件类型核对完成，允许加载', avNumber ?? '', iso ? 'iso' : 'video')
 
     // 如果视频没有番号，则不加载扩展信息
     if (!avNumber) {
@@ -67,7 +86,7 @@ export class FileItemModExtInfo extends FileItemModBase {
 
     /*
      * ================================================================================
-     * 步骤1：延迟挂载视口外详情组件
+     * 步骤2：延迟挂载视口外详情组件
      * ================================================================================
      * 目标：大目录只创建视口附近的 Vue 与 Shadow DOM，减少首屏阻塞。
      * 数据源：文件列表滚动容器和详情占位节点。
@@ -146,7 +165,7 @@ export class FileItemModExtInfo extends FileItemModBase {
 
     /*
      * ================================================================================
-     * 步骤2：挂载可见番号详情
+     * 步骤3：挂载可见番号详情
      * ================================================================================
      * 目标：复用共享样式表，并在进入预加载范围后启动资料请求。
      * 数据源：当前详情容器和番号。
