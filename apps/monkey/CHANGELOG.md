@@ -1,5 +1,12 @@
 # @115master/monkey
 
+## 2.0.0-beta.85
+
+### Minor Changes
+
+- MASTER、新版和旧版文件列表支持为单个视频生成标准 ED2K 链，任务可查看进度、取消并复制结果。
+- ED2K 按真实文件字节计算 MD4，使用 HTTP Range 分段读取和 Worker 流水线处理大文件，避免整文件进入内存。
+
 ## 2.0.0-beta.84
 
 ### Patch Changes

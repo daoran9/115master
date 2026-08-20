@@ -310,7 +310,7 @@ test.describe('新版 115 原生文件列表适配', () => {
       '__115masterOfficialFileCapture__' in window.fetch,
     )).toBe(true)
     expect(await page.locator('html').getAttribute('data-115master-official-file-list'))
-      .toBe('2.0.0-beta.84')
+      .toBe('2.0.0-beta.85')
 
     /**
      * ================================================================================
