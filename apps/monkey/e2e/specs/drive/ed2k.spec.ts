@@ -1,5 +1,6 @@
 /* eslint-disable jsdoc/convert-to-jsdoc-comments */
 import type { Item } from '../../support/fixtures/files'
+import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
 import { CORS, FILES_RE, filesRes, folder, gmRequests, json, video } from '../../support'
 import { boot, menu, row, watch } from './helpers'
@@ -228,5 +229,81 @@ test.describe('ED2K 链', () => {
     )
     expect(errors).toEqual([])
     logger.info('ED2K Worker 静默失败回退验证完成')
+  })
+
+  /**
+   * ============================================================================
+   * 步骤5：验证四块批次失败后续算
+   * ============================================================================
+   * 目标：首批次完成后，尾批次断网会刷新地址并只重试尾批次。
+   * 数据源：38,912,000 字节首批次、三字节尾批次和一次连接重置。
+   * 操作：
+   * 1) 为每个下载槽返回带独立 token 的临时地址
+   * 2) 让尾批次首次请求断网
+   * 3) 核对 Range 次数、地址刷新和最终链接
+   */
+  test('resumes a failed four-part batch with a refreshed URL', async ({ page }) => {
+    test.slow()
+    const errors = watch(page)
+    const partSize = 9_728_000
+    const batchSize = partSize * 4
+    const size = batchSize + 3
+    const item = { ...fixture('四块批次续算.mp4'), s: size }
+    const expected = '85F8C66EC4FEE811C7524DAC889E091C'
+    let links = 0
+    let tail = 0
+    await boot(page, {
+      mocks: (api) => {
+        api.override(FILES_RE, ({ route }) => json(route, files(item)))
+        api.override(DOWNLOAD_RE, ({ route }) => json(route, {
+          file_url: `${FILE_URL}?token=${++links}`,
+          state: true,
+        }))
+        api.override(SOURCE_RE, async ({ route, request }) => {
+          const value = request.headers().range
+          if (value === `bytes=${batchSize}-${batchSize + 2}` && tail++ === 0) {
+            await route.abort('connectionreset')
+            return true
+          }
+
+          const first = value === `bytes=0-${batchSize - 1}`
+          expect(first || value === `bytes=${batchSize}-${batchSize + 2}`).toBe(true)
+          await route.fulfill({
+            status: 206,
+            headers: {
+              ...CORS,
+              'access-control-expose-headers': 'Content-Range',
+              'content-range': first
+                ? `bytes 0-${batchSize - 1}/${size}`
+                : `bytes ${batchSize}-${batchSize + 2}/${size}`,
+            },
+            body: first ? Buffer.alloc(batchSize) : Buffer.from('abc'),
+          })
+          return true
+        })
+      },
+    })
+    logger.info('开始验证离线 ED2K 四块批次失败续算')
+
+    // 5.1 从单视频菜单启动两个网络批次
+    await row(page, item.n).click({ button: 'right' })
+    await menu(page).getByRole('menuitem', { name: '生成 ED2K 链' }).click()
+
+    // 5.2 尾批次断网后刷新地址，任务仍生成完整标准链接
+    const result = page.getByRole('dialog', { name: 'ED2K 链已生成' })
+    await expect(result.getByRole('textbox', { name: 'ED2K 链' })).toHaveValue(
+      `ed2k://|file|四块批次续算.mp4|${size}|${expected}|/`,
+    )
+
+    // 5.3 已完成首批次只读取一次，尾批次两次且刷新了 token
+    const requests = (await gmRequests(page)).filter(request => SOURCE_RE.test(request.url))
+    const first = requests.filter(request => request.headers.Range === `bytes=0-${batchSize - 1}`)
+    const retries = requests.filter(request => request.headers.Range === `bytes=${batchSize}-${batchSize + 2}`)
+    expect(first).toHaveLength(1)
+    expect(retries).toHaveLength(2)
+    expect(retries[0]!.url).not.toBe(retries[1]!.url)
+    expect(links).toBe(2)
+    expect(errors).toEqual([])
+    logger.info('离线 ED2K 四块批次失败续算验证完成')
   })
 })

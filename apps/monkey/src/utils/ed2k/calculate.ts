@@ -1,6 +1,6 @@
 import type { IRequest } from '@115master/shared'
 import type { Ed2kWorkerRequest, Ed2kWorkerResponse } from './protocol'
-import { Logger } from '@115master/shared'
+import { InfraError, Logger } from '@115master/shared'
 import Ed2kWorker from './ed2k.worker?worker&inline'
 import {
   buildEd2kLink,
@@ -20,7 +20,7 @@ export interface Ed2kProgress {
 export interface Ed2kSource {
   cookie?: string
   name: string
-  resolve?: () => Promise<Ed2kEndpoint>
+  resolve?: (signal?: AbortSignal) => Promise<Ed2kEndpoint>
   size: number
   url?: string
 }
@@ -36,8 +36,18 @@ export interface Ed2kOptions {
   signal?: AbortSignal
 }
 
+interface Ed2kState {
+  parts: string[]
+  started: number
+}
+
 const logger = new Logger('ED2KCalculate')
-const RANGE_CONCURRENCY = 3
+const RANGE_CONCURRENCY = 1
+export const ED2K_BATCH_PARTS = 4
+export const ED2K_BATCH_SIZE = ED2K_PART_SIZE * ED2K_BATCH_PARTS
+export const ED2K_NETWORK_RETRIES = 3
+const PROGRESS_INTERVAL = 250
+const RETRY_DELAY = 500
 const WORKER_START_TIMEOUT = 1_500
 const WORKER_TASK_TIMEOUT = 30_000
 
@@ -45,6 +55,33 @@ class RangeResponseError extends Error {
   constructor(status: number) {
     super(`服务器不支持 Range 206（HTTP ${status}），已停止读取以避免整文件一次性载入内存`)
     this.name = 'RangeResponseError'
+  }
+}
+
+class RangeIntegrityError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'RangeIntegrityError'
+  }
+}
+
+class RangeDownloadError extends Error {
+  declare cause: unknown
+
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause))
+    this.name = 'RangeDownloadError'
+    this.cause = cause
+  }
+}
+
+class EndpointResolveError extends Error {
+  declare cause: unknown
+
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause))
+    this.name = 'EndpointResolveError'
+    this.cause = cause
   }
 }
 
@@ -68,7 +105,7 @@ function assertRange(response: Response, start: number, end: number, total: numb
 
   const range = contentRange(response)
   if (!range || range.start !== start || range.end !== end || range.total !== total)
-    throw new Error('服务器返回的 Content-Range 与请求不一致')
+    throw new RangeIntegrityError('服务器返回的 Content-Range 与请求不一致')
 }
 
 interface WorkerSendOptions {
@@ -202,38 +239,132 @@ function assertEndpoint(endpoint: Ed2kEndpoint) {
     throw new Error('115 下载地址无效')
 }
 
+function abortError(signal: AbortSignal) {
+  return signal.reason ?? new DOMException('请求已取消', 'AbortError')
+}
+
+function abortable<T>(promise: Promise<T>, signal: AbortSignal) {
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(abortError(signal))
+    if (signal.aborted) {
+      abort()
+      return
+    }
+
+    signal.addEventListener('abort', abort, { once: true })
+    promise.then(resolve, reject).finally(() => {
+      signal.removeEventListener('abort', abort)
+    })
+  })
+}
+
+function waitForRetry(attempt: number, signal: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    const timer = globalThis.setTimeout(done, RETRY_DELAY * 2 ** (attempt - 1))
+
+    function cleanup() {
+      globalThis.clearTimeout(timer)
+      signal.removeEventListener('abort', abort)
+    }
+
+    function done() {
+      cleanup()
+      resolve()
+    }
+
+    function abort() {
+      cleanup()
+      reject(abortError(signal))
+    }
+
+    if (signal.aborted) {
+      abort()
+      return
+    }
+    signal.addEventListener('abort', abort, { once: true })
+  })
+}
+
+async function resolveEndpoint(source: Ed2kSource, signal: AbortSignal) {
+  signal.throwIfAborted()
+  if (!source.resolve) {
+    const endpoint = { cookie: source.cookie, url: source.url! }
+    assertEndpoint(endpoint)
+    return endpoint
+  }
+
+  try {
+    const endpoint = await abortable(source.resolve(signal), signal)
+    signal.throwIfAborted()
+    assertEndpoint(endpoint)
+    return endpoint
+  }
+  catch (cause) {
+    if (signal.aborted)
+      throw abortError(signal)
+    throw new EndpointResolveError(cause)
+  }
+}
+
 /**
  * ============================================================================
- * 步骤2：分段读取并计算 ED2K
+ * 步骤2：分批读取并计算 ED2K
  * ============================================================================
- * 目标：以 9,728,000 字节 Range 分块读取原文件，在 Worker 中计算摘要。
+ * 目标：每次 Range 读取四个协议块，再在 Worker 中分别计算标准摘要。
  * 数据源：115 原文件临时下载地址。
  * 操作：
- * 1) 用三个下载槽并发请求并严格校验 206 响应
- * 2) 按 Range 序号保存 Worker 摘要
- * 3) 汇总摘要并生成链接
+ * 1) 用单连接读取四块批次并严格校验 206 响应
+ * 2) 失败批次最多重试三次，每次刷新临时下载地址
+ * 3) 保留已完成摘要并按协议块序号汇总生成链接
  */
 async function calculate(
   source: Ed2kSource,
   options: Ed2kOptions,
   concurrency: number,
+  state: Ed2kState,
 ) {
   logger.info('开始分段计算 ED2K', source.name, source.size)
   assertSource(source, options.signal)
 
-  const started = performance.now()
   const count = Math.ceil(source.size / ED2K_PART_SIZE)
-  const parts = Array.from({ length: count }, () => '')
-  const progress = Array.from({ length: count }, () => 0)
+  const batchCount = Math.ceil(source.size / ED2K_BATCH_SIZE)
+  if (state.parts.length === 0 && count > 0)
+    state.parts.push(...Array.from({ length: count }, () => ''))
+  const complete = (index: number) => {
+    const start = index * ED2K_BATCH_PARTS
+    const length = Math.min(ED2K_BATCH_PARTS, count - start)
+    return state.parts.slice(start, start + length).every(Boolean)
+  }
+  const size = (index: number) => Math.min(
+    ED2K_BATCH_SIZE,
+    source.size - index * ED2K_BATCH_SIZE,
+  )
+  const progress = Array.from(
+    { length: batchCount },
+    (_, index) => complete(index) ? size(index) : 0,
+  )
+  const batches = Array.from(
+    { length: batchCount },
+    (_, index) => index,
+  ).filter(index => !complete(index))
   const controller = new AbortController()
-  let loaded = 0
+  let loaded = progress.reduce((total, value) => total + value, 0)
   let next = 0
+  let reported = 0
 
-  const report = (stage: Ed2kProgress['stage'], current = loaded) => {
+  const report = (
+    stage: Ed2kProgress['stage'],
+    current = loaded,
+    force = stage !== 'download',
+  ) => {
+    const now = performance.now()
+    if (!force && now - reported < PROGRESS_INTERVAL)
+      return
+    reported = now
     options.onProgress?.({
       loaded: current,
       parts: count,
-      speed: current / Math.max((performance.now() - started) / 1000, 0.001),
+      speed: current / Math.max((now - state.started) / 1000, 0.001),
       stage,
       total: source.size,
     })
@@ -244,47 +375,64 @@ async function calculate(
   if (options.signal?.aborted)
     abort()
 
-  const update = (index: number, value: number) => {
-    const start = index * ED2K_PART_SIZE
-    const size = Math.min(ED2K_PART_SIZE, source.size - start)
-    const current = Math.max(progress[index]!, Math.min(value, size))
+  const update = (index: number, value: number, force = false) => {
+    const current = Math.max(progress[index]!, Math.min(value, size(index)))
     loaded += current - progress[index]!
     progress[index] = current
-    report('download')
+    report('download', loaded, force)
+  }
+
+  const reset = (index: number) => {
+    loaded -= progress[index]!
+    progress[index] = 0
+    report('download', loaded, true)
   }
 
   const download = async (index: number, endpoint: Ed2kEndpoint) => {
-    const start = index * ED2K_PART_SIZE
-    const end = Math.min(start + ED2K_PART_SIZE, source.size) - 1
+    const start = index * ED2K_BATCH_SIZE
+    const end = Math.min(start + ED2K_BATCH_SIZE, source.size) - 1
     const size = end - start + 1
-    logger.info('开始读取 ED2K 分块', index + 1, count, start, end)
+    logger.info('开始读取 ED2K 网络批次', index + 1, batchCount, start, end)
 
-    /** 2.1 每个下载槽独立上报进度，汇总时去除重复事件字节。 */
-    const response = await options.request.get(endpoint.url, {
-      cache: 'no-cache',
-      cookie: endpoint.cookie,
-      headers: {
-        'Range': `bytes=${start}-${end}`,
-        'User-Agent': navigator.userAgent,
-      },
-      maxResponseBytes: size,
-      onProgress: value => update(index, value.loaded),
-      redirect: 'follow',
-      responseType: 'arraybuffer',
-      signal: controller.signal,
-      timeout: 180_000,
-      validateResponse: ({ status }) => {
-        if (status !== 206)
-          throw new RangeResponseError(status)
-      },
-    })
+    /** 2.1 单连接上报当前批次进度，重试时只重置失败批次。 */
+    let response: Response
+    try {
+      response = await options.request.get(endpoint.url, {
+        cache: 'no-cache',
+        cookie: endpoint.cookie,
+        headers: {
+          'Range': `bytes=${start}-${end}`,
+          'User-Agent': navigator.userAgent,
+        },
+        maxResponseBytes: size,
+        onProgress: value => update(index, value.loaded),
+        redirect: 'follow',
+        responseType: 'arraybuffer',
+        signal: controller.signal,
+        timeout: 180_000,
+        validateResponse: ({ status }) => {
+          if (status !== 206)
+            throw new RangeResponseError(status)
+        },
+      })
+    }
+    catch (cause) {
+      if (
+        controller.signal.aborted
+        || cause instanceof RangeResponseError
+        || (cause instanceof InfraError && !cause.retryable)
+      ) {
+        throw cause
+      }
+      throw new RangeDownloadError(cause)
+    }
     assertRange(response, start, end, source.size)
 
     const buffer = await response.arrayBuffer()
     if (buffer.byteLength !== size)
-      throw new Error('服务器返回的分块字节数与请求不一致')
-    update(index, size)
-    logger.info('ED2K 分块读取完成', index + 1, count)
+      throw new RangeIntegrityError('服务器返回的批次字节数与请求不一致')
+    update(index, size, true)
+    logger.info('ED2K 网络批次读取完成', index + 1, batchCount)
     return buffer
   }
 
@@ -293,61 +441,105 @@ async function calculate(
     buffer: ArrayBuffer,
     worker: Worker | null,
   ) => {
-    // 2.2 下载槽已开始读取下一块，再计算当前块以隐藏 MD4 耗时
-    report('hash')
+    /** 2.2 网络批次按 9,728,000 字节切片，协议摘要边界保持不变。 */
+    const start = index * ED2K_BATCH_PARTS
+    const length = Math.min(ED2K_BATCH_PARTS, count - start)
+    let hashes: string[]
     if (worker) {
-      const result = await send(worker, { type: 'part', buffer }, {
+      const result = await send(worker, { type: 'batch', buffer }, {
         signal: controller.signal,
         timeout: WORKER_TASK_TIMEOUT,
         transfer: [buffer],
       })
-      if (result.type !== 'part')
-        throw new Error('ED2K Worker 返回了错误的分块响应')
-      parts[index] = result.hash
+      if (result.type !== 'batch' || result.hashes.length !== length)
+        throw new Error('ED2K Worker 返回了错误的批次响应')
+      hashes = result.hashes
     }
     else {
-      parts[index] = await hashEd2kPart(new Uint8Array(buffer))
+      const data = new Uint8Array(buffer)
+      hashes = await Promise.all(Array.from({ length }, (_, offset) => (
+        hashEd2kPart(data.subarray(
+          offset * ED2K_PART_SIZE,
+          Math.min((offset + 1) * ED2K_PART_SIZE, data.byteLength),
+        ))
+      )))
     }
 
-    logger.info('ED2K 分块摘要完成', index + 1, count)
+    hashes.forEach((value, offset) => {
+      state.parts[start + offset] = value
+    })
+    logger.info('ED2K 网络批次摘要完成', index + 1, batchCount, hashes.length)
+  }
+
+  interface LaneState {
+    endpoint?: Ed2kEndpoint
+  }
+
+  const retry = async (index: number, state: LaneState) => {
+    let last: unknown
+    for (let attempt = 0; attempt <= ED2K_NETWORK_RETRIES; attempt += 1) {
+      try {
+        controller.signal.throwIfAborted()
+        if (attempt > 0) {
+          await waitForRetry(attempt, controller.signal)
+          state.endpoint = undefined
+        }
+        state.endpoint ??= await resolveEndpoint(source, controller.signal)
+        return await download(index, state.endpoint)
+      }
+      catch (cause) {
+        reset(index)
+        if (controller.signal.aborted)
+          throw abortError(controller.signal)
+        if (
+          !(cause instanceof EndpointResolveError)
+          && !(cause instanceof RangeDownloadError)
+        ) {
+          throw cause
+        }
+
+        last = cause
+        state.endpoint = undefined
+        if (attempt >= ED2K_NETWORK_RETRIES)
+          throw cause
+        logger.warn(
+          'ED2K 网络批次读取失败，准备刷新临时地址重试',
+          index + 1,
+          batchCount,
+          attempt + 1,
+          ED2K_NETWORK_RETRIES,
+          cause,
+        )
+      }
+    }
+    throw last
   }
 
   const lane = async () => {
     const workerPromise = startWorker(controller.signal)
     let worker: Worker | null = null
     try {
-      const resolved = await Promise.all([
-        workerPromise,
-        source.resolve
-          ? source.resolve()
-          : Promise.resolve({ cookie: source.cookie, url: source.url! }),
-      ])
-      worker = resolved[0]
-      const endpoint = resolved[1]
-      assertEndpoint(endpoint)
-      report('download')
-
+      worker = await workerPromise
+      report('download', loaded, true)
+      const state: LaneState = {}
       const queue = () => {
         controller.signal.throwIfAborted()
-        const index = next
-        if (index >= count)
+        const index = batches[next]
+        if (index === undefined)
           return
         next += 1
-        const pending = download(index, endpoint).then(buffer => ({
-          buffer,
-          index,
-        }))
+        const pending = retry(index, state).then(buffer => ({ buffer, index }))
         void pending.catch(() => undefined)
         return pending
       }
 
       let pending = queue()
       while (pending) {
-        const part = await pending
+        const batch = await pending
 
-        // 2.3 当前响应已完整释放连接，下一块下载与当前 Worker 哈希重叠
+        // 2.3 当前响应已释放连接，下一批下载与当前 Worker 哈希重叠
         pending = queue()
-        await hash(part.index, part.buffer, worker)
+        await hash(batch.index, batch.buffer, worker)
       }
     }
     catch (cause) {
@@ -361,9 +553,9 @@ async function calculate(
   }
 
   try {
-    report(source.resolve ? 'link' : 'download')
+    report(source.resolve ? 'link' : 'download', loaded, true)
     const lanes = Array.from(
-      { length: Math.min(concurrency, count) },
+      { length: Math.min(concurrency, batchCount) },
       () => lane(),
     )
     try {
@@ -375,9 +567,9 @@ async function calculate(
       throw cause
     }
 
-    // 2.4 原始分块已释放，只在主线程汇总有序的 16 字节摘要
+    // 2.4 原始批次已释放，只在主线程汇总有序的 16 字节摘要
     report('finish')
-    const hash = await finishEd2kHash(parts, source.size)
+    const hash = await finishEd2kHash(state.parts, source.size)
     const link = buildEd2kLink(source.name, source.size, hash)
     logger.info('ED2K 分段计算完成', source.name, source.size)
     return link
@@ -390,24 +582,28 @@ async function calculate(
 
 /**
  * ============================================================================
- * 步骤3：自适应生成 ED2K
+ * 步骤3：稳定生成 ED2K
  * ============================================================================
- * 目标：支持多路 Range 的 CDN 使用三路并发，受限节点自动回退单连接。
- * 数据源：并发阶段的 Range 响应状态和用户取消信号。
+ * 目标：用单连接批次流水线避免 115 CDN 多路限速，并兼容临时非 206 响应。
+ * 数据源：批次 Range 响应状态和用户取消信号。
  * 操作：
- * 1) 优先尝试三个下载槽
- * 2) 非 206 时清理并发任务并从零串行重试
+ * 1) 单连接读取下一批时由 Worker 计算当前批
+ * 2) 非 206 时刷新地址，保留已完成摘要后补算
  */
 export async function calculateEd2k(source: Ed2kSource, options: Ed2kOptions) {
-  logger.info('开始自适应生成 ED2K', source.name, source.size)
+  logger.info('开始稳定生成 ED2K', source.name, source.size)
+  const state: Ed2kState = {
+    parts: [],
+    started: performance.now(),
+  }
 
   try {
-    const link = await calculate(source, options, RANGE_CONCURRENCY)
-    logger.info('自适应生成 ED2K 完成，并发模式', source.name)
+    const link = await calculate(source, options, RANGE_CONCURRENCY, state)
+    logger.info('稳定生成 ED2K 完成，单连接流水线', source.name)
     return link
   }
   catch (cause) {
-    const count = Math.ceil(source.size / ED2K_PART_SIZE)
+    const count = Math.ceil(source.size / ED2K_BATCH_SIZE)
     if (
       !(cause instanceof RangeResponseError)
       || count <= 1
@@ -416,10 +612,10 @@ export async function calculateEd2k(source: Ed2kSource, options: Ed2kOptions) {
       throw cause
     }
 
-    // 3.1 并发请求已全部取消并释放，再用一个新地址从零串行读取
-    logger.warn('115 CDN 拒绝多路 Range，回退单连接', cause.message)
-    const link = await calculate(source, options, 1)
-    logger.info('自适应生成 ED2K 完成，单连接模式', source.name)
+    // 3.1 当前请求已取消并释放，新地址只读取尚未完成的网络批次
+    logger.warn('115 CDN 返回非 206，刷新地址并保留已完成摘要', cause.message)
+    const link = await calculate(source, options, 1, state)
+    logger.info('稳定生成 ED2K 完成，刷新地址模式', source.name)
     return link
   }
 }

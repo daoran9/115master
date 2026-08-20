@@ -1,5 +1,5 @@
-export interface Ed2kPartRequest {
-  type: 'part'
+export interface Ed2kBatchRequest {
+  type: 'batch'
   buffer: ArrayBuffer
 }
 
@@ -8,16 +8,16 @@ export interface Ed2kPingRequest {
 }
 
 export type Ed2kWorkerRequest
-  = | Ed2kPartRequest
+  = | Ed2kBatchRequest
     | Ed2kPingRequest
 
 export interface Ed2kReadyResponse {
   type: 'ready'
 }
 
-export interface Ed2kPartResponse {
-  type: 'part'
-  hash: string
+export interface Ed2kBatchResponse {
+  type: 'batch'
+  hashes: string[]
 }
 
 export interface Ed2kErrorResponse {
@@ -26,6 +26,6 @@ export interface Ed2kErrorResponse {
 }
 
 export type Ed2kWorkerResponse
-  = | Ed2kErrorResponse
-    | Ed2kPartResponse
+  = | Ed2kBatchResponse
+    | Ed2kErrorResponse
     | Ed2kReadyResponse
