@@ -124,7 +124,7 @@ test('serves public update metadata without exposing controller commands', async
     )
     const metadata = await metadataResponse.text()
     assert.equal(metadataResponse.status, 200)
-    assert.match(metadata, /@version\s+0\.2\.14/)
+    assert.match(metadata, /@version\s+0\.2\.15/)
     assert.match(metadata, /@updateURL\s+http:\/\/127\.0\.0\.1:11531/)
     assert.doesNotMatch(metadata, /\(function \(\)/)
 
@@ -351,7 +351,7 @@ test('reads Fusion state inside a visible same-origin iframe', () => {
       1,
     )
     assert.equal(api.findTextCandidates('Master 播放', true).length, 1)
-    assert.equal(status.bridgeVersion, '0.2.14')
+    assert.equal(status.bridgeVersion, '0.2.15')
     assert.equal(status.pageFeatures.accessibleDocumentCount, 2)
     assert.equal(status.native.legacyRowCount, 1)
     assert.equal(status.native.visibleLegacyRowCount, 1)
@@ -366,18 +366,40 @@ test('reads Fusion state inside a visible same-origin iframe', () => {
     assert.equal(status.fusion.details[0].source, 'JavLibrary')
     assert.equal(status.pageFeatures.documents[1].frameVisible, true)
 
-    /** 2.3 核对封面诊断保留 meta content 与图片 src/srcset。 */
+    /** 2.3 核对 FANZA 请求和 DMM 图片只开放所需 HTTPS 主机。 */
+    assert.equal(
+      api.validateSourceUrl('https://video.dmm.co.jp/').hostname,
+      'video.dmm.co.jp',
+    )
+    assert.equal(
+      api.validateSourceUrl('https://api.video.dmm.co.jp/graphql').hostname,
+      'api.video.dmm.co.jp',
+    )
+    assert.equal(
+      api.validateImageUrl('https://pics.dmm.co.jp/mono/movie/test/testpl.jpg').hostname,
+      'pics.dmm.co.jp',
+    )
+    assert.equal(
+      api.validateImageUrl('https://awsimgsrc.dmm.co.jp/pics_dig/test.jpg').hostname,
+      'awsimgsrc.dmm.co.jp',
+    )
+    assert.throws(
+      () => api.validateImageUrl('http://awsimgsrc.dmm.co.jp/pics_dig/test.jpg'),
+      /图片 URL 不在测试白名单/,
+    )
+
+    /** 2.4 核对封面诊断保留 meta content 与图片 src/srcset。 */
     const metaDescription = api.queryElements({ selector: 'meta[property="og:image"]' })
     const imageDescription = api.queryElements({ selector: 'img[src]' })
     assert.equal(metaDescription.elements[0].attributes.content, 'https://pics.example.com/cover-t.jpg')
     assert.equal(imageDescription.elements[0].attributes.src, 'https://pics.example.com/cover-n.jpg')
     assert.equal(imageDescription.elements[0].attributes.srcset, 'https://pics.example.com/cover-n@2x.jpg 2x')
 
-    /** 2.4 核对 SVG 图标点击，确保新版搜索入口可被自动化触发。 */
+    /** 2.5 核对 SVG 图标点击，确保新版搜索入口可被自动化触发。 */
     api.clickElement({ selector: '[data-search-icon]' })
     assert.equal(searchClickCount, 1)
 
-    /** 2.5 核对悬停事件和媒体摘要；输出中只能保留 CDN origin。 */
+    /** 2.6 核对悬停事件和媒体摘要；输出中只能保留 CDN origin。 */
     api.hoverElement({ selector: '#media-target' })
     const mediaStatus = api.readMediaStatus({ selector: '#media-target' })
     assert.equal(hoverCount, 1)

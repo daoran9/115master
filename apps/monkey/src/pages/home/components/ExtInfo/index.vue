@@ -18,6 +18,7 @@
       :class="[
         styles.container.content,
         props.variant === 'drive' && styles.container.driveContent,
+        props.variant === 'legacy' && styles.container.legacyContent,
       ]"
     >
       <!-- 错误状态 -->
@@ -37,19 +38,32 @@
 
       <!-- 内容 -->
       <template v-else-if="extInfo.state.value">
-        <div :class="[styles.cover.container, props.variant === 'drive' && styles.cover.drive]">
+        <div
+          :class="[
+            styles.cover.container,
+            props.variant === 'drive' && styles.cover.drive,
+            props.variant === 'legacy' && styles.cover.legacy,
+          ]"
+        >
           <a href="javascript:void(0)" :alt="extInfo.state.value?.title" :class="styles.cover.link">
             <Image
               :src="coverCandidates[0]?.url ?? ''"
               :alt="extInfo.state.value?.title ?? ''"
               :loader="coverLoader"
+              :fit="props.variant === 'legacy' ? 'contain' : 'cover'"
               class="size-full"
             />
           </a>
         </div>
 
-        <div :class="[styles.main.container, props.variant === 'drive' && styles.main.drive]">
-          <div :class="styles.title.container">
+        <div
+          :class="[
+            styles.main.container,
+            props.variant === 'drive' && styles.main.drive,
+            props.variant === 'legacy' && styles.main.legacy,
+          ]"
+        >
+          <div :class="[styles.title.container, props.variant === 'legacy' && styles.title.legacy]">
             <a
               :href="extInfo.state.value?.detailUrl"
               target="_blank"
@@ -57,15 +71,22 @@
               :alt="extInfo.state.value?.title"
               :class="styles.title.link"
             >
-              {{ extInfo.state.value?.source }} {{ extInfo.state.value?.title }}
+              <template v-if="props.variant === 'legacy'">{{ extInfo.state.value?.title }}</template>
+              <template v-else>{{ extInfo.state.value?.source }} {{ extInfo.state.value?.title }}</template>
             </a>
           </div>
 
-          <div :class="[styles.content.container, props.variant === 'drive' && styles.content.drive]">
-            <div :class="styles.content.group">
-              <div :class="styles.item.container">
-                <span :class="styles.item.label">番号</span>
-                <span v-if="extInfo.state.value?.avNumber" :class="styles.item.value">
+          <div
+            :class="[
+              styles.content.container,
+              props.variant === 'drive' && styles.content.drive,
+              props.variant === 'legacy' && styles.content.legacy,
+            ]"
+          >
+            <div :class="[styles.content.group, props.variant === 'legacy' && styles.content.legacyGroup]">
+              <div :class="[styles.item.container, props.variant === 'legacy' && styles.item.legacy]">
+                <span :class="[styles.item.label, props.variant === 'legacy' && styles.item.legacyLabel]">番号</span>
+                <span v-if="extInfo.state.value?.avNumber" :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">
                   <a
                     :href="extInfo.state.value?.detailUrl"
                     target="_blank"
@@ -75,30 +96,30 @@
                     {{ extInfo.state.value?.avNumber }}
                   </a>
                 </span>
-                <span v-else :class="styles.item.value">-</span>
+                <span v-else :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">-</span>
               </div>
 
-              <div :class="[styles.item.container, styles.secondary]">
-                <span :class="styles.item.label">日期</span>
-                <span v-if="extInfo.state.value?.date" :class="styles.item.value">
+              <div :class="[styles.item.container, props.variant === 'legacy' && styles.item.legacy, props.variant === 'legacy' ? styles.secondaryLegacy : styles.secondary]">
+                <span :class="[styles.item.label, props.variant === 'legacy' && styles.item.legacyLabel]">日期</span>
+                <span v-if="extInfo.state.value?.date" :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">
                   {{ format.date(extInfo.state.value?.date) }}
                 </span>
-                <span v-else :class="styles.item.value">-</span>
+                <span v-else :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">-</span>
               </div>
 
-              <div :class="[styles.item.container, styles.secondary]">
-                <span :class="styles.item.label">时长</span>
-                <span v-if="extInfo.state.value?.duration" :class="styles.item.value">
+              <div :class="[styles.item.container, props.variant === 'legacy' && styles.item.legacy, props.variant === 'legacy' ? styles.secondaryLegacy : styles.secondary]">
+                <span :class="[styles.item.label, props.variant === 'legacy' && styles.item.legacyLabel]">时长</span>
+                <span v-if="extInfo.state.value?.duration" :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">
                   {{ format.duration(extInfo.state.value?.duration) }}
                 </span>
-                <span v-else :class="styles.item.value">-</span>
+                <span v-else :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">-</span>
               </div>
             </div>
 
-            <div :class="styles.content.group">
-              <div :class="styles.item.container">
-                <span :class="styles.item.label">演员</span>
-                <span v-if="extInfo.state.value?.actors" :class="styles.item.value">
+            <div :class="[styles.content.group, props.variant === 'legacy' && styles.content.legacyGroup]">
+              <div :class="[styles.item.container, props.variant === 'legacy' && styles.item.legacy]">
+                <span :class="[styles.item.label, props.variant === 'legacy' && styles.item.legacyLabel]">演员</span>
+                <span v-if="extInfo.state.value?.actors" :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">
                   <a
                     v-for="actor in extInfo.state.value?.actors"
                     :key="actor.url"
@@ -110,12 +131,12 @@
                     {{ actor.name }}
                   </a>
                 </span>
-                <span v-else :class="styles.item.value">-</span>
+                <span v-else :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">-</span>
               </div>
 
-              <div :class="[styles.item.container, styles.secondary]">
-                <span :class="styles.item.label">导演</span>
-                <span v-if="extInfo.state.value?.director" :class="styles.item.value">
+              <div :class="[styles.item.container, props.variant === 'legacy' && styles.item.legacy, props.variant === 'legacy' ? styles.secondaryLegacy : styles.secondary]">
+                <span :class="[styles.item.label, props.variant === 'legacy' && styles.item.legacyLabel]">导演</span>
+                <span v-if="extInfo.state.value?.director" :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">
                   <a
                     v-for="director in extInfo.state.value?.director"
                     :key="director.url"
@@ -127,30 +148,36 @@
                     {{ director.name }}
                   </a>
                 </span>
-                <span v-else :class="styles.item.value">-</span>
+                <span v-else :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">-</span>
               </div>
 
-              <div v-if="extInfo.state.value?.category" :class="[styles.item.container, styles.secondary]">
-                <span :class="styles.item.label">分类</span>
-                <span v-if="extInfo.state.value?.category" :class="styles.item.value">
+              <div v-if="extInfo.state.value?.category" :class="[styles.item.container, props.variant === 'legacy' && styles.item.legacy, props.variant === 'legacy' ? styles.secondaryLegacy : styles.secondary]">
+                <span :class="[styles.item.label, props.variant === 'legacy' && styles.item.legacyLabel]">分类</span>
+                <span v-if="extInfo.state.value?.category" :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">
                   <a
                     v-for="category in extInfo.state.value?.category"
                     :key="category.url"
                     :href="category.url"
                     target="_blank"
                     :alt="category.name"
-                    :class="styles.item.badge"
+                    :class="props.variant === 'legacy' ? styles.item.link : styles.item.badge"
                   >
                     {{ category.name }}
                   </a>
                 </span>
-                <span v-else :class="styles.item.value">-</span>
+                <span v-else :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">-</span>
               </div>
             </div>
           </div>
         </div>
 
-        <div :class="[styles.meta.avNumber, props.variant === 'drive' && styles.meta.drive]">
+        <div
+          :class="[
+            styles.meta.avNumber,
+            props.variant === 'drive' && styles.meta.drive,
+            props.variant === 'legacy' && styles.meta.legacy,
+          ]"
+        >
           {{ props.avNumber }}
         </div>
       </template>
@@ -168,7 +195,7 @@ import {
   LoadingError,
 } from '@/components'
 import { clsx } from '@/utils/clsx'
-import { createGMImageFallbackLoader } from '@/utils/imageLoader'
+import { createFanzaCoverLoader } from '@/utils/imageLoader'
 import { createJavInfoSources } from '@/utils/jav'
 import { loadJavInfo } from '@/utils/jav/loadInfo'
 import { appLogger } from '@/utils/logger'
@@ -186,13 +213,14 @@ const styles = clsx({
   // 容器样式
   container: {
     main: 'w-full',
-    legacyMain: 'h-24 px-20',
+    legacyMain: 'mr-[74px] ml-[34px] box-border min-h-[212px] !w-auto gap-6 rounded-2xl bg-[#f8f8fa] px-4 py-4 text-[#333]',
     driveMain: 'min-h-20 px-3 pt-2 pb-3',
     officialMain: 'min-h-24 px-4 py-2',
     officialPanelMain: 'min-h-24 px-4 py-2',
     officialPending: 'h-px overflow-hidden',
     content: 'group relative flex h-full items-center gap-1',
     driveContent: 'flex-col items-stretch gap-2',
+    legacyContent: '!gap-6',
   },
   // 状态样式
   states: {
@@ -203,16 +231,19 @@ const styles = clsx({
   cover: {
     container: 'flex h-24 w-36 items-center justify-center',
     drive: 'hidden',
+    legacy: '!h-[180px] !w-[267px] shrink-0 overflow-hidden rounded-xl shadow-lg',
     link: 'block h-full w-full',
   },
   // 主要内容样式
   main: {
     container: 'flex flex-1 flex-col gap-2',
     drive: 'w-full min-w-0',
+    legacy: '!gap-5',
   },
   // 标题样式
   title: {
     container: 'text-md text-base-content/70 ml-2',
+    legacy: '!ml-0 !text-[18px] !font-semibold !text-[#333]',
     link: 'hover:text-primary line-clamp-1 transition-colors hover:underline',
   },
   // 内容样式
@@ -220,6 +251,8 @@ const styles = clsx({
     container: 'ml-2 flex flex-1 items-start gap-5',
     drive: 'ml-0 grid grid-cols-1 gap-1 sm:grid-cols-2',
     group: 'flex min-w-32 flex-col gap-0.5',
+    legacy: '!ml-0 !gap-6',
+    legacyGroup: '!min-w-40 !gap-3',
   },
   // 项目样式
   item: {
@@ -228,13 +261,18 @@ const styles = clsx({
     value: 'text-base-content/70 line-clamp-1 flex flex-1 flex-wrap gap-2',
     link: 'hover:text-primary transition-colors hover:underline',
     badge: 'bg-base-200 hover:bg-base-200 rounded px-1 py-[1px] text-xs',
+    legacy: '!gap-3',
+    legacyLabel: '!h-auto !w-8 !shrink-0 !text-[#999]',
+    legacyValue: '!gap-2 !text-[#333]',
   },
   // 次要信息样式
   secondary: 'opacity-60',
+  secondaryLegacy: 'opacity-100',
   // 元信息样式
   meta: {
     avNumber: 'text-base-content/40 absolute right-4 bottom-2 text-xs',
     drive: 'hidden',
+    legacy: '!right-4 !bottom-2 !text-xs !text-[#999] !opacity-30',
   },
 })
 
@@ -301,6 +339,10 @@ const coverCandidates = computed(() => {
 const coverLoader = computed(() => {
   if (!coverCandidates.value.length)
     return undefined
-  return createGMImageFallbackLoader(coverCandidates.value)
+  return createFanzaCoverLoader({
+    avNumber: props.avNumber,
+    title: extInfo.state.value?.title,
+    fallbacks: coverCandidates.value,
+  })
 })
 </script>

@@ -6,6 +6,7 @@ const logger = appLogger.sub('Jav')
 
 /** 来源 */
 export enum JAV_SOURCE {
+  FANZA = 'FANZA',
   FD2PPV = 'FD2PPV',
   JAVBUS = 'JavBus',
   JAVDB = 'JavDB',

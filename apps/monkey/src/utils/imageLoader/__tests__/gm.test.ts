@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   cacheSet: vi.fn(),
   cacheRemove: vi.fn(),
   compress: vi.fn(async (blob: Blob) => blob),
+  bitmap: vi.fn(async () => ({ width: 1600, height: 900, close: vi.fn() })),
 }))
 
 vi.mock('@/utils/request/gmRequest', () => ({
@@ -38,10 +39,12 @@ beforeEach(() => {
     createObjectURL: vi.fn(() => 'blob:loaded'),
     revokeObjectURL: vi.fn(),
   })
+  vi.stubGlobal('createImageBitmap', mocks.bitmap)
 })
 
 afterEach(() => {
   vi.useRealTimers()
+  vi.unstubAllGlobals()
 })
 
 describe('createGMImageLoader', () => {
@@ -76,16 +79,47 @@ describe('createGMImageLoader', () => {
     expect(mocks.compress).not.toHaveBeenCalled()
   })
 
-  it('separates cache entries by referer, cookie partition and transform version', () => {
+  it('separates cache entries by referer, cookie partition, validation and transform version', () => {
     const first = createGMImageLoader({ referer: 'https://first' })
     const second = createGMImageLoader({ referer: 'https://second' })
     const original = createGMImageLoader({ referer: 'https://first', transform: false })
+    const validated = createGMImageLoader({ referer: 'https://first', minBytes: 3000, minAspectRatio: 1.1 })
     const partitioned = createGMImageLoader({
       referer: 'https://first',
       cookiePartition: { topLevelSite: 'https://first' },
     })
 
-    expect(new Set([first.key, second.key, original.key, partitioned.key])).toHaveLength(4)
+    expect(new Set([first.key, second.key, original.key, validated.key, partitioned.key])).toHaveLength(5)
+  })
+
+  it('rejects the 2732-byte DMM placeholder before decoding and caching', async () => {
+    const blob = new Blob(['x'.repeat(2732)], { type: 'image/jpeg' })
+    mocks.get.mockResolvedValue({ ok: true, status: 200, blob: async () => blob })
+    const loader = createGMImageLoader({ minBytes: 3000 })
+
+    await expect(loader.load('https://pics.dmm.co.jp/now-printing.jpg', new AbortController().signal))
+      .rejects
+      .toThrow('2732B')
+
+    expect(mocks.bitmap).not.toHaveBeenCalled()
+    expect(mocks.compress).not.toHaveBeenCalled()
+    expect(mocks.cacheSet).not.toHaveBeenCalled()
+  })
+
+  it('rejects a portrait image when a horizontal cover is required', async () => {
+    const close = vi.fn()
+    const blob = new Blob(['x'.repeat(4000)], { type: 'image/jpeg' })
+    mocks.bitmap.mockResolvedValueOnce({ width: 90, height: 122, close })
+    mocks.get.mockResolvedValue({ ok: true, status: 200, blob: async () => blob })
+    const loader = createGMImageLoader({ minBytes: 3000, minAspectRatio: 1.1 })
+
+    await expect(loader.load('https://pics.dmm.co.jp/portrait.jpg', new AbortController().signal))
+      .rejects
+      .toThrow('90x122')
+
+    expect(close).toHaveBeenCalledOnce()
+    expect(mocks.compress).not.toHaveBeenCalled()
+    expect(mocks.cacheSet).not.toHaveBeenCalled()
   })
 
   it('refetches expired cache entries', async () => {

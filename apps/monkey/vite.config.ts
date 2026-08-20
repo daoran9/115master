@@ -126,6 +126,8 @@ export default defineConfig({
           'c0.jdbstatic.com',
           '*.jdbstatic.com',
           'pics.dmm.co.jp',
+          'api.video.dmm.co.jp',
+          'awsimgsrc.dmm.co.jp',
           'pics.dmm.com',
           'imgsrc.dmm.com',
           'missav.ws',

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         115Master Local Test Bridge
 // @namespace    https://github.com/daoran9/115master/testing
-// @version      0.2.14
+// @version      0.2.15
 // @description  Connects a normally started 115Browser tab to the local acceptance controller.
 // @downloadURL  http://127.0.0.1:11531/updates/bridge.user.js
 // @updateURL    http://127.0.0.1:11531/updates/bridge.meta.js
@@ -27,6 +27,10 @@
 // @connect      *.myfansdb.com
 // @connect      content.mfcdn.jp
 // @connect      *.mfcdn.jp
+// @connect      video.dmm.co.jp
+// @connect      api.video.dmm.co.jp
+// @connect      pics.dmm.co.jp
+// @connect      awsimgsrc.dmm.co.jp
 // ==/UserScript==
 
 /* global GM_deleteValue, GM_getValue, GM_registerMenuCommand, GM_setValue, GM_xmlhttpRequest */
@@ -35,7 +39,7 @@
 (function () {
   'use strict'
 
-  const BRIDGE_VERSION = '0.2.14'
+  const BRIDGE_VERSION = '0.2.15'
   const CONFIG_KEY = '115master-live-bridge-config'
   const CLIENT_ID_KEY = '115master-live-bridge-client-id'
   const FUSION_CACHE_DATABASE = '115master_cache'
@@ -59,6 +63,8 @@
     'www.myfansdb.com',
     'adult.myfansdb.com',
     'gay.myfansdb.com',
+    'video.dmm.co.jp',
+    'api.video.dmm.co.jp',
   ])
   const IMAGE_HOSTS = new Set([
     'fourhoi.com',
@@ -67,6 +73,8 @@
     'xximgs.cc',
     'www.xximgs.cc',
     'content.mfcdn.jp',
+    'pics.dmm.co.jp',
+    'awsimgsrc.dmm.co.jp',
   ])
   const IMAGE_HOST_SUFFIXES = [
     '.contents.fc2.com',
@@ -96,6 +104,8 @@
       scrollPage,
       setInputValue,
       summarizeHtmlResponse,
+      validateImageUrl,
+      validateSourceUrl,
     })
 
     logger.info('测试桥 DOM 验证接口暴露完成')

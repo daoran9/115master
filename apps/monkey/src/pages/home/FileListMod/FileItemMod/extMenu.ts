@@ -40,7 +40,7 @@ export class FileItemModExtMenu extends FileItemModBase {
       {
         class: '115-player',
         title: '使用【115官方播放器】',
-        text: '官方播放',
+        text: this.itemInfo.surface === 'legacy' ? '5️⃣ 官方播放' : '官方播放',
         visible: this.itemInfo.attributes.iv === IvType.Yes,
         click: () => {
           GM_openInTab(
@@ -77,7 +77,7 @@ export class FileItemModExtMenu extends FileItemModBase {
       {
         class: 'master-player',
         title: '使用【Master播放器】',
-        text: 'Master 播放',
+        text: this.itemInfo.surface === 'legacy' ? '▶️ Master 播放' : 'Master 播放',
         visible: this.itemInfo.attributes.iv === IvType.Yes,
         click: () => {
           goToPlayer(

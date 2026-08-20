@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
-import { CORS, HOME_URL, json, setupHarness } from '../../support'
+import { CORS, gmRequests, HOME_URL, json, setupHarness } from '../../support'
 import { gmStore, replaceList, watch, watchTabs } from '../../support/homeUtils'
 import { html } from '../../support/mockApi'
 import { homeHtml } from '../../support/pages/homeHtml'
@@ -24,10 +24,10 @@ test.describe('FileListMod', () => {
     await expect(page.locator('a.ed2k-link')).toHaveCount(40)
     const masterBtn = page.locator('li[iv="1"] a.master-player').first()
     await expect(masterBtn).toHaveAttribute('title', '使用【Master播放器】')
-    await expect(masterBtn).toHaveText('Master 播放')
+    await expect(masterBtn).toHaveText('▶️ Master 播放')
     const officialBtn = page.locator('li[iv="1"] a[class="115-player"]').first()
     await expect(officialBtn).toHaveAttribute('title', '使用【115官方播放器】')
-    await expect(officialBtn).toHaveText('官方播放')
+    await expect(officialBtn).toHaveText('5️⃣ 官方播放')
     const ed2kBtn = page.locator('li[iv="1"] a.ed2k-link').first()
     await expect(ed2kBtn).toHaveAttribute('title', '生成 ED2K 链')
     await expect(ed2kBtn).toHaveText('ED2K')
@@ -160,6 +160,269 @@ test.describe('FileListMod', () => {
     await expect(windows.locator('[data-115master-detail]')).toHaveCount(0)
 
     logger.info('视频和 ISO 番号资料验证完成')
+    expect(errors).toEqual([])
+  })
+
+  test('旧版番号详情优先显示 DMM 实体横封套', async ({ page }) => {
+    const errors = watch(page)
+    const mono = 'https://pics.dmm.co.jp/mono/movie/abp123/abp123pl.jpg'
+    const fallback = 'https://images.e2e.local/abp-123-fallback.png'
+    await setupHarness(page, {
+      mocks: (api) => {
+        api.override(/^https:\/\/www\.javlibrary\.com\//, ({ route }) => {
+          return route.fulfill({ status: 404, body: '' }).then(() => true as const)
+        })
+        api.override(/^https:\/\/www\.javbus\.com\/ABP-123/, ({ route }) => {
+          return html(route, `
+            <div class="container">
+              <h3>ABP-123 实体横封套回归</h3>
+              <div class="movie">
+                <a class="bigImage"><img src="${fallback}"></a>
+                <div class="info"><p><span class="header">識別碼:</span><span>ABP-123</span></p></div>
+              </div>
+            </div>
+          `)
+        })
+        api.override(/^https:\/\/pics\.dmm\.co\.jp\/mono\/movie\/abp123\/abp123pl\.jpg/, async ({ route }) => {
+          await route.fulfill({
+            contentType: 'image/png',
+            body: Buffer.concat([
+              Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADklEQVR4nGP4z8DwHwQBEPgD/U6VwW8AAAAASUVORK5CYII=', 'base64'),
+              Buffer.alloc(4000),
+            ]),
+          })
+          return true
+        })
+        api.override(/^https:\/\/(javdb\.com|missav\.ws)\//, ({ route }) => {
+          return route.fulfill({ status: 404, body: '' }).then(() => true as const)
+        })
+      },
+    })
+    await page.goto(HOME_URL)
+
+    /*
+     * ================================================================================
+     * 步骤1：核对实体横封套优先级
+     * ================================================================================
+     * 目标：DMM 实体图有效时直接显示，不访问 GraphQL 和原有封面图片。
+     * 数据源：ABP-123 横版 PNG 和 JavBus 后备图地址。
+     * 操作：
+     * 1) 注入番号视频并等待封面显示
+     * 2) 核对 GM 请求只命中实体横封套
+     */
+    logger.info('开始核对实体横封套优先级')
+
+    // 1.1 注入一条拥有实体横封套的番号视频。
+    await replaceList(page, [
+      { title: 'ABP-123.mp4', iv: '1', file_type: '1', pick_code: 'monoCoverPick', sha1: 'MONOCOVERSHA1' },
+    ])
+    const cover = page.locator('li[pick_code="monoCoverPick"] [data-115master-detail] .ext-info-root img')
+    await expect(cover).toBeVisible()
+
+    /** 1.2 实体图成功后不再请求 FANZA 查询或 JavBus 后备图片。 */
+    const requests = await gmRequests(page)
+    expect(requests.some(request => request.url === mono)).toBe(true)
+    expect(requests.some(request => request.url === 'https://api.video.dmm.co.jp/graphql')).toBe(false)
+    expect(requests.some(request => request.url === fallback)).toBe(false)
+
+    logger.info('实体横封套优先级核对完成')
+    expect(errors).toEqual([])
+  })
+
+  test('旧版番号详情优先现有横封套而非 FANZA 数字竖图', async ({ page }) => {
+    const errors = watch(page)
+    const wide = 'https://images.e2e.local/abp-124-wide.png'
+    const digital = 'https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/118abp00124/118abp00124pl.jpg'
+    await setupHarness(page, {
+      mocks: (api) => {
+        api.override(/^https:\/\/www\.javlibrary\.com\//, ({ route }) => {
+          return route.fulfill({ status: 404, body: '' }).then(() => true as const)
+        })
+        api.override(/^https:\/\/www\.javbus\.com\/ABP-124/, ({ route }) => {
+          return html(route, `
+            <div class="container">
+              <h3>ABP-124 横封套优先回归</h3>
+              <div class="movie">
+                <a class="bigImage"><img src="${wide}"></a>
+                <div class="info"><p><span class="header">識別碼:</span><span>ABP-124</span></p></div>
+              </div>
+            </div>
+          `)
+        })
+        api.override(/^https:\/\/pics\.dmm\.co\.jp\/mono\/movie\//, async ({ route }) => {
+          await route.fulfill({
+            contentType: 'image/jpeg',
+            body: Buffer.alloc(2732),
+          })
+          return true
+        })
+        api.override(/^https:\/\/api\.video\.dmm\.co\.jp\/graphql/, ({ route }) => {
+          return json(route, {
+            data: {
+              legacySearchPPV: {
+                result: {
+                  contents: [{
+                    id: '118abp00124',
+                    title: 'ABP-124 FANZA 数字版',
+                    packageImage: { largeUrl: digital },
+                  }],
+                },
+              },
+            },
+          })
+        })
+        api.override(/^https:\/\/images\.e2e\.local\/abp-124-wide\.png/, async ({ route }) => {
+          await route.fulfill({
+            contentType: 'image/png',
+            body: Buffer.concat([
+              Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADklEQVR4nGP4z8DwHwQBEPgD/U6VwW8AAAAASUVORK5CYII=', 'base64'),
+              Buffer.alloc(4000),
+            ]),
+          })
+          return true
+        })
+        api.override(/^https:\/\/(javdb\.com|missav\.ws)\//, ({ route }) => {
+          return route.fulfill({ status: 404, body: '' }).then(() => true as const)
+        })
+      },
+    })
+    await page.goto(HOME_URL)
+
+    /*
+     * ================================================================================
+     * 步骤1：核对跨来源横封套优先级
+     * ================================================================================
+     * 目标：DMM 实体图无效时，保留其他来源横封套，不降级成 FANZA 竖图。
+     * 数据源：ABP-124 JavBus 横图、DMM 占位图和 FANZA 数字图地址。
+     * 操作：
+     * 1) 注入番号视频并等待横封套显示
+     * 2) 核对横图已请求且数字竖图未请求
+     */
+    logger.info('开始核对跨来源横封套优先级')
+
+    // 1.1 注入同时具备横封套和数字竖图的番号视频。
+    await replaceList(page, [
+      { title: 'ABP-124.mp4', iv: '1', file_type: '1', pick_code: 'wideFallbackPick', sha1: 'WIDEFALLBACKSHA1' },
+    ])
+    const cover = page.locator('li[pick_code="wideFallbackPick"] [data-115master-detail] .ext-info-root img')
+    await expect(cover).toBeVisible()
+
+    /** 1.2 真实横封套优先，FANZA 数字竖图不进入图片请求链。 */
+    const requests = await gmRequests(page)
+    expect(requests.some(request => request.url === wide)).toBe(true)
+    expect(requests.some(request => request.url === digital)).toBe(false)
+
+    logger.info('跨来源横封套优先级核对完成')
+    expect(errors).toEqual([])
+  })
+
+  test('旧版番号详情用 FANZA 数字图回退 DMM 占位图', async ({ page }) => {
+    const errors = watch(page)
+    const queries: string[] = []
+    const digital = 'https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/h_1472hmdnv00767/h_1472hmdnv00767pl.jpg'
+    const fallback = 'https://images.e2e.local/hmdnv-767-portrait.png'
+    await setupHarness(page, {
+      mocks: (api) => {
+        api.override(/^https:\/\/www\.javlibrary\.com\//, ({ route }) => {
+          return route.fulfill({ status: 404, body: '' }).then(() => true as const)
+        })
+        api.override(/^https:\/\/www\.javbus\.com\/HMDNV-767/, ({ route }) => {
+          return html(route, `
+            <div class="container">
+              <h3>HMDNV-767 竖版封面回归</h3>
+              <div class="movie">
+                <a class="bigImage"><img src="${fallback}"></a>
+                <div class="info"><p><span class="header">識別碼:</span><span>HMDNV-767</span></p></div>
+              </div>
+            </div>
+          `)
+        })
+        api.override(/^https:\/\/pics\.dmm\.co\.jp\/mono\/movie\//, async ({ route }) => {
+          await route.fulfill({
+            contentType: 'image/jpeg',
+            body: Buffer.alloc(2732),
+          })
+          return true
+        })
+        api.override(/^https:\/\/api\.video\.dmm\.co\.jp\/graphql/, ({ route, request }) => {
+          const body = request.postDataJSON() as { variables?: { word?: string } }
+          const word = body.variables?.word ?? ''
+          queries.push(word)
+          if (word === 'HMDNV-767') {
+            return json(route, {
+              data: { legacySearchPPV: { result: { contents: [] } } },
+            })
+          }
+          return json(route, {
+            data: {
+              legacySearchPPV: {
+                result: {
+                  contents: [{
+                    id: 'h_1472hmdnv00767',
+                    title: 'HMDNV-767 竖版封面回归',
+                    packageImage: { largeUrl: digital },
+                  }],
+                },
+              },
+            },
+          })
+        })
+        api.override(/^https:\/\/awsimgsrc\.dmm\.co\.jp\/pics_dig\/digital\/video\/h_1472hmdnv00767\//, async ({ route }) => {
+          await route.fulfill({
+            contentType: 'image/png',
+            body: Buffer.concat([
+              Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAACCAYAAACZgbYnAAAAEElEQVR42mP4z8DwH4QZGBgAHgQCAJXb5L8AAAAASUVORK5CYII=', 'base64'),
+              Buffer.alloc(4000),
+            ]),
+          })
+          return true
+        })
+        api.override(/^https:\/\/images\.e2e\.local\/hmdnv-767-portrait\.png/, async ({ route }) => {
+          await route.fulfill({
+            contentType: 'image/png',
+            body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAACCAYAAACZgbYnAAAAEElEQVR42mP4z8DwH4QZGBgAHgQCAJXb5L8AAAAASUVORK5CYII=', 'base64'),
+          })
+          return true
+        })
+        api.override(/^https:\/\/(javdb\.com|missav\.ws)\//, ({ route }) => {
+          return route.fulfill({ status: 404, body: '' }).then(() => true as const)
+        })
+      },
+    })
+    await page.goto(HOME_URL)
+
+    /*
+     * ================================================================================
+     * 步骤1：核对 FANZA 数字封面回退
+     * ================================================================================
+     * 目标：拒绝 DMM 占位图，并用现有详情标题找到官方数字竖图。
+     * 数据源：2732B mono 占位图、FANZA GraphQL 和 HMDNV-767 数字图。
+     * 操作：
+     * 1) 注入番号视频并等待详情封面加载
+     * 2) 核对标题回查顺序、图片来源和 contain 缩放
+     */
+    logger.info('开始核对 FANZA 数字封面回退')
+
+    // 1.1 只保留一条竖版封面的番号视频。
+    await replaceList(page, [
+      { title: 'HMDNV-767.mp4', iv: '1', file_type: '1', pick_code: 'portraitCoverPick', sha1: 'PORTRAITCOVERSHA1' },
+    ])
+    const detail = page.locator('li[pick_code="portraitCoverPick"] [data-115master-detail]')
+    const cover = detail.locator('.ext-info-root img')
+
+    // 1.2 官方竖图完整缩放，原有 JavBus 图片不再请求。
+    await expect(cover).toBeVisible()
+    await expect(cover).toHaveCSS('object-fit', 'contain')
+    await expect(cover).toHaveCSS('width', '267px')
+    await expect(cover).toHaveCSS('height', '180px')
+    expect(queries).toEqual(['HMDNV-767', '竖版封面回归'])
+    const requests = await gmRequests(page)
+    const fallbackIndex = requests.findIndex(request => request.url === fallback)
+    const digitalIndex = requests.findIndex(request => request.url === digital)
+    expect(fallbackIndex).toBeGreaterThan(-1)
+    expect(digitalIndex).toBeGreaterThan(fallbackIndex)
+
+    logger.info('FANZA 数字封面回退核对完成')
     expect(errors).toEqual([])
   })
 
