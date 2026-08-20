@@ -1,4 +1,4 @@
-import type { Ed2kProgress } from './calculate'
+import type { Ed2kBatchMetric, Ed2kProgress } from './calculate'
 import type { Ed2kFile } from './generate'
 import { GM_setClipboard } from '$'
 import { format } from '@115master/utils'
@@ -97,6 +97,9 @@ export async function openEd2kDialog(file: Ed2kFile) {
   const error = root.querySelector<HTMLElement>('.error')!
   const cancel = root.querySelector<HTMLButtonElement>('.cancel')!
   const copy = root.querySelector<HTMLButtonElement>('.copy')!
+  const downloads: number[] = []
+  const hashes: number[] = []
+  const attempts: number[] = []
   let settled = false
 
   const close = () => {
@@ -117,6 +120,20 @@ export async function openEd2kDialog(file: Ed2kFile) {
   try {
     const link = await generateEd2k(file, {
       signal: controller.signal,
+      onBatch: (value: Ed2kBatchMetric) => {
+        // 1.3 按协议批次保存短诊断序列，测试桥读取时不会暴露临时下载地址
+        downloads[value.batch - 1] = Number((
+          value.bytes / Math.max(value.downloadMs / 1000, 0.001) / 1024 / 1024
+        ).toFixed(1))
+        hashes[value.batch - 1] = Math.round(value.hashMs)
+        attempts[value.batch - 1] = value.attempts
+        host.dataset.ed2kAddresses = String(value.addresses)
+        host.dataset.ed2kAttempts = attempts.join(',')
+        host.dataset.ed2kBatches = `${value.batch}/${value.batches}`
+        host.dataset.ed2kDownloadMbps = downloads.join(',')
+        host.dataset.ed2kHashMs = hashes.join(',')
+        host.dataset.ed2kWorker = value.worker
+      },
       onProgress: (value) => {
         const ratio = value.total === 0 ? 100 : Math.round(value.loaded / value.total * 100)
         status.textContent = stages[value.stage]
@@ -127,7 +144,7 @@ export async function openEd2kDialog(file: Ed2kFile) {
       },
     })
 
-    // 1.3 成功后保留链接供核对，复制使用用户脚本原生剪贴板能力
+    // 1.4 成功后保留链接供核对，复制使用用户脚本原生剪贴板能力
     settled = true
     title.textContent = 'ED2K 链已生成'
     status.hidden = true

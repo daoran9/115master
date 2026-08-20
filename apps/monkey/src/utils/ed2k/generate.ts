@@ -20,9 +20,9 @@ export type GenerateEd2kOptions = Omit<Ed2kOptions, 'request'>
  * 步骤1：生成 115 文件 ED2K 链
  * ============================================================================
  * 目标：让独立 Fusion 页和官方页复用同一条下载与计算链。
- * 数据源：文件名、pick code、文件大小和单连接使用的 115 临时地址。
+ * 数据源：文件名、pick code、文件大小和各下载通道使用的 115 临时地址。
  * 操作：
- * 1) 为单连接获取临时地址，失败重试时刷新
+ * 1) 为每条下载通道获取临时地址，失败重试时刷新
  * 2) 合并各自的认证 Cookie
  * 3) 分块读取并计算 ED2K
  */
@@ -37,7 +37,7 @@ export async function generateEd2k(file: Ed2kFile, options: GenerateEd2kOptions 
     total: file.size,
   })
 
-  // 1.1 单连接初次获取临时地址，网络重试时重新获取
+  // 1.1 每条下载通道初次获取临时地址，网络重试时重新获取
   const link = await calculateEd2k({
     name: file.name,
     resolve: async (signal) => {

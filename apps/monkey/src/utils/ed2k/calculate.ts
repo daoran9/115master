@@ -17,6 +17,17 @@ export interface Ed2kProgress {
   total: number
 }
 
+export interface Ed2kBatchMetric {
+  addresses: number
+  attempts: number
+  batch: number
+  batches: number
+  bytes: number
+  downloadMs: number
+  hashMs: number
+  worker: 'main' | 'worker'
+}
+
 export interface Ed2kSource {
   cookie?: string
   name: string
@@ -31,18 +42,26 @@ export interface Ed2kEndpoint {
 }
 
 export interface Ed2kOptions {
+  onBatch?: (metric: Ed2kBatchMetric) => void
   onProgress?: (progress: Ed2kProgress) => void
   request: IRequest
   signal?: AbortSignal
 }
 
 interface Ed2kState {
+  addresses: number
   parts: string[]
   started: number
 }
 
+interface DownloadedBatch {
+  attempts: number
+  buffer: ArrayBuffer
+  downloadMs: number
+}
+
 const logger = new Logger('ED2KCalculate')
-const RANGE_CONCURRENCY = 1
+const RANGE_CONCURRENCY = 2
 export const ED2K_BATCH_PARTS = 4
 export const ED2K_BATCH_SIZE = ED2K_PART_SIZE * ED2K_BATCH_PARTS
 export const ED2K_NETWORK_RETRIES = 3
@@ -313,7 +332,7 @@ async function resolveEndpoint(source: Ed2kSource, signal: AbortSignal) {
  * 目标：每次 Range 读取四个协议块，再在 Worker 中分别计算标准摘要。
  * 数据源：115 原文件临时下载地址。
  * 操作：
- * 1) 用单连接读取四块批次并严格校验 206 响应
+ * 1) 用两条下载通道分别读取四块批次并严格校验 206 响应
  * 2) 失败批次最多重试三次，每次刷新临时下载地址
  * 3) 保留已完成摘要并按协议块序号汇总生成链接
  */
@@ -392,9 +411,10 @@ async function calculate(
     const start = index * ED2K_BATCH_SIZE
     const end = Math.min(start + ED2K_BATCH_SIZE, source.size) - 1
     const size = end - start + 1
+    const started = performance.now()
     logger.info('开始读取 ED2K 网络批次', index + 1, batchCount, start, end)
 
-    /** 2.1 单连接上报当前批次进度，重试时只重置失败批次。 */
+    /** 2.1 每条通道上报当前批次进度，重试时只重置失败批次。 */
     let response: Response
     try {
       response = await options.request.get(endpoint.url, {
@@ -433,7 +453,10 @@ async function calculate(
       throw new RangeIntegrityError('服务器返回的批次字节数与请求不一致')
     update(index, size, true)
     logger.info('ED2K 网络批次读取完成', index + 1, batchCount)
-    return buffer
+    return {
+      buffer,
+      downloadMs: performance.now() - started,
+    }
   }
 
   const hash = async (
@@ -475,17 +498,24 @@ async function calculate(
     endpoint?: Ed2kEndpoint
   }
 
-  const retry = async (index: number, state: LaneState) => {
+  const retry = async (index: number, lane: LaneState): Promise<DownloadedBatch> => {
     let last: unknown
     for (let attempt = 0; attempt <= ED2K_NETWORK_RETRIES; attempt += 1) {
       try {
         controller.signal.throwIfAborted()
         if (attempt > 0) {
           await waitForRetry(attempt, controller.signal)
-          state.endpoint = undefined
+          lane.endpoint = undefined
         }
-        state.endpoint ??= await resolveEndpoint(source, controller.signal)
-        return await download(index, state.endpoint)
+        if (!lane.endpoint) {
+          lane.endpoint = await resolveEndpoint(source, controller.signal)
+          state.addresses += 1
+        }
+        const batch = await download(index, lane.endpoint)
+        return {
+          attempts: attempt + 1,
+          ...batch,
+        }
       }
       catch (cause) {
         reset(index)
@@ -499,7 +529,7 @@ async function calculate(
         }
 
         last = cause
-        state.endpoint = undefined
+        lane.endpoint = undefined
         if (attempt >= ED2K_NETWORK_RETRIES)
           throw cause
         logger.warn(
@@ -521,14 +551,14 @@ async function calculate(
     try {
       worker = await workerPromise
       report('download', loaded, true)
-      const state: LaneState = {}
+      const lane: LaneState = {}
       const queue = () => {
         controller.signal.throwIfAborted()
         const index = batches[next]
         if (index === undefined)
           return
         next += 1
-        const pending = retry(index, state).then(buffer => ({ buffer, index }))
+        const pending = retry(index, lane).then(batch => ({ ...batch, index }))
         void pending.catch(() => undefined)
         return pending
       }
@@ -539,7 +569,20 @@ async function calculate(
 
         // 2.3 当前响应已释放连接，下一批下载与当前 Worker 哈希重叠
         pending = queue()
+        const started = performance.now()
         await hash(batch.index, batch.buffer, worker)
+        const metric: Ed2kBatchMetric = {
+          addresses: state.addresses,
+          attempts: batch.attempts,
+          batch: batch.index + 1,
+          batches: batchCount,
+          bytes: size(batch.index),
+          downloadMs: batch.downloadMs,
+          hashMs: performance.now() - started,
+          worker: worker ? 'worker' : 'main',
+        }
+        options.onBatch?.(metric)
+        logger.info('ED2K 网络批次诊断完成', metric)
       }
     }
     catch (cause) {
@@ -584,22 +627,23 @@ async function calculate(
  * ============================================================================
  * 步骤3：稳定生成 ED2K
  * ============================================================================
- * 目标：用单连接批次流水线避免 115 CDN 多路限速，并兼容临时非 206 响应。
+ * 目标：用双通道批次流水线利用 115 CDN 突发带宽，并兼容临时非 206 响应。
  * 数据源：批次 Range 响应状态和用户取消信号。
  * 操作：
- * 1) 单连接读取下一批时由 Worker 计算当前批
+ * 1) 两条通道独立取临时地址，下载下一批时由 Worker 计算当前批
  * 2) 非 206 时刷新地址，保留已完成摘要后补算
  */
 export async function calculateEd2k(source: Ed2kSource, options: Ed2kOptions) {
   logger.info('开始稳定生成 ED2K', source.name, source.size)
   const state: Ed2kState = {
+    addresses: 0,
     parts: [],
     started: performance.now(),
   }
 
   try {
     const link = await calculate(source, options, RANGE_CONCURRENCY, state)
-    logger.info('稳定生成 ED2K 完成，单连接流水线', source.name)
+    logger.info('稳定生成 ED2K 完成，双通道流水线', source.name)
     return link
   }
   catch (cause) {

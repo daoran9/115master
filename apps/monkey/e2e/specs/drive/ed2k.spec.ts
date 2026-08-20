@@ -238,7 +238,7 @@ test.describe('ED2K 链', () => {
    * 目标：首批次完成后，尾批次断网会刷新地址并只重试尾批次。
    * 数据源：38,912,000 字节首批次、三字节尾批次和一次连接重置。
    * 操作：
-   * 1) 为每个下载槽返回带独立 token 的临时地址
+   * 1) 为两条下载通道返回带独立 token 的临时地址
    * 2) 让尾批次首次请求断网
    * 3) 核对 Range 次数、地址刷新和最终链接
    */
@@ -302,7 +302,7 @@ test.describe('ED2K 链', () => {
     expect(first).toHaveLength(1)
     expect(retries).toHaveLength(2)
     expect(retries[0]!.url).not.toBe(retries[1]!.url)
-    expect(links).toBe(2)
+    expect(links).toBe(3)
     expect(errors).toEqual([])
     logger.info('离线 ED2K 四块批次失败续算验证完成')
   })

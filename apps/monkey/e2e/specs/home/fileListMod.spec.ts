@@ -1,8 +1,11 @@
+import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
-import { HOME_URL, json, setupHarness } from '../../support'
+import { CORS, HOME_URL, json, setupHarness } from '../../support'
 import { gmStore, replaceList, watch, watchTabs } from '../../support/homeUtils'
 import { html } from '../../support/mockApi'
 import { homeHtml } from '../../support/pages/homeHtml'
+
+const logger = console
 
 /**
  * FileListMod：文件列表增强（FileItemMod 插件数组）
@@ -376,5 +379,67 @@ test.describe('FileItemMod 交互', () => {
     await page.locator('li[title="动漫"] a[menu="download_dir_one"]').dispatchEvent('click')
     await expect.poll(() => dialogs).toEqual(['文件夹下载需要 115Browser'])
     expect(errors).toEqual([])
+  })
+
+  /**
+   * ============================================================================
+   * 步骤8：验证 ED2K 批次诊断数据
+   * ============================================================================
+   * 目标：真实弹窗完成 Range 和 MD4 后向测试桥暴露短诊断序列。
+   * 数据源：100 字节离线视频、临时下载地址和标准 206 响应。
+   * 操作：
+   * 1) 替换列表并生成 ED2K 链
+   * 2) 核对批次速度、哈希耗时和尝试次数
+   * 3) 核对地址数与 Worker 路径
+   */
+  test('ED2K 完成后向测试桥暴露批次诊断数据', async ({ page }) => {
+    const errors = watch(page)
+    const fileUrl = 'https://cdnfhnfile.115cdn.net/home-ed2k-diagnostic.mp4'
+    await setupHarness(page, {
+      mocks: (api) => {
+        api.override(/^https:\/\/webapi\.115\.com\/files\/download/, ({ route }) => (
+          json(route, { state: true, file_url: fileUrl })
+        ))
+        api.override(/^https:\/\/cdnfhnfile\.115cdn\.net\/home-ed2k-diagnostic\.mp4/, async ({ route, request }) => {
+          expect(request.headers().range).toBe('bytes=0-99')
+          await route.fulfill({
+            status: 206,
+            headers: {
+              ...CORS,
+              'access-control-expose-headers': 'Content-Range',
+              'content-range': 'bytes 0-99/100',
+            },
+            body: Buffer.alloc(100),
+          })
+          return true
+        })
+      },
+    })
+    await page.goto(HOME_URL)
+    await replaceList(page, [{
+      title: 'ED2K 诊断.mp4',
+      iv: '1',
+      file_type: '1',
+      pick_code: 'diagnosticPick',
+      sha1: 'DIAGNOSTICSHA1',
+    }])
+    logger.info('开始验证 ED2K 批次诊断数据')
+
+    // 8.1 启动小文件任务并等待真实结果弹窗
+    await page.locator('a.ed2k-link').click()
+    const host = page.locator('[data-115master-ed2k-dialog]')
+    await expect(host.locator('h2')).toHaveText('ED2K 链已生成')
+
+    // 8.2 单批次必须记录速度、哈希耗时和一次成功尝试
+    await expect(host).toHaveAttribute('data-ed2k-batches', '1/1')
+    await expect(host).toHaveAttribute('data-ed2k-download-mbps', /\d/)
+    await expect(host).toHaveAttribute('data-ed2k-hash-ms', /^\d+$/)
+    await expect(host).toHaveAttribute('data-ed2k-attempts', '1')
+
+    // 8.3 首次地址解析只出现一次，Worker 状态必须明确可读
+    await expect(host).toHaveAttribute('data-ed2k-addresses', '1')
+    await expect(host).toHaveAttribute('data-ed2k-worker', /^(main|worker)$/)
+    expect(errors).toEqual([])
+    logger.info('ED2K 批次诊断数据验证完成')
   })
 })

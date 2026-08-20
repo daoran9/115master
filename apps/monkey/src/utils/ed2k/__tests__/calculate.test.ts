@@ -102,6 +102,7 @@ describe('calculateEd2k batched ranges', () => {
 
     // 1.1 单个网络响应包含四个内容可区分的标准协议块
     const data = bytes(ED2K_BATCH_SIZE, 1)
+    const onBatch = vi.fn()
     const get = vi.fn<IRequest['get']>(async (_url, options) => {
       const value = range(options)
       return response(data, value, data.byteLength)
@@ -112,7 +113,7 @@ describe('calculateEd2k batched ranges', () => {
       name: '四块批次.mp4',
       size: data.byteLength,
       url: SOURCE_URL,
-    }, { request: request(get) })
+    }, { onBatch, request: request(get) })
     expect(get).toHaveBeenCalledTimes(1)
     expect(range(get.mock.calls[0]![1])).toEqual({
       end: ED2K_BATCH_SIZE - 1,
@@ -126,23 +127,34 @@ describe('calculateEd2k batched ranges', () => {
     await expect(expected([1, 2, 3, 4], data.byteLength)).resolves.toBe(
       result.match(/\|(\w{32})\|\/$/)?.[1],
     )
+    expect(onBatch).toHaveBeenCalledTimes(1)
+    expect(onBatch).toHaveBeenCalledWith({
+      addresses: 1,
+      attempts: 1,
+      batch: 1,
+      batches: 1,
+      bytes: ED2K_BATCH_SIZE,
+      downloadMs: expect.any(Number),
+      hashMs: expect.any(Number),
+      worker: 'main',
+    })
 
     logger.info('ED2K 四块网络批次验证完成')
   })
 
   /**
    * ============================================================================
-   * 步骤2：验证单连接下载与哈希流水线
+   * 步骤2：验证双通道下载与哈希顺序
    * ============================================================================
-   * 目标：当前批次计算摘要时，单连接已经开始读取下一批次。
+   * 目标：两个网络批次并行读取时，协议摘要仍保持原文件顺序。
    * 数据源：一个完整四块批次和一个单字节尾批次。
    * 操作：
    * 1) 暂停首个协议摘要
-   * 2) 核对尾批次已开始下载
-   * 3) 释放摘要并核对最终顺序
+   * 2) 核对两条通道都已开始下载
+   * 3) 释放摘要并核对最终顺序和地址数
    */
   it('pipelines the next download while preserving protocol part order', async () => {
-    logger.info('开始验证 ED2K 单连接批次流水线')
+    logger.info('开始验证 ED2K 双通道批次顺序')
 
     // 2.1 首个协议摘要暂停时，其余摘要仍可进入同一批次任务
     const size = ED2K_BATCH_SIZE + 1
@@ -162,26 +174,26 @@ describe('calculateEd2k batched ranges', () => {
       )
     })
 
-    // 2.2 首批摘要未完成前，下一批 Range 已经由同一下载槽发出
+    // 2.2 首批摘要未完成前，两条通道都已发出各自的 Range
     const pending = calculateEd2k({
-      name: '单连接流水线.mp4',
+      name: '双通道流水线.mp4',
       resolve,
       size,
     }, { request: request(get) })
     await vi.waitFor(() => expect(get).toHaveBeenCalledTimes(2))
     gate.resolve()
 
-    // 2.3 一个地址和一个下载槽完成两批，协议摘要仍保持文件顺序
+    // 2.3 两个地址完成两批，协议摘要仍保持文件顺序
     await expect(pending).resolves.toBe(
-      `ed2k://|file|单连接流水线.mp4|${size}|${await expected([1, 2, 3, 4, 5], size)}|/`,
+      `ed2k://|file|双通道流水线.mp4|${size}|${await expected([1, 2, 3, 4, 5], size)}|/`,
     )
-    expect(resolve).toHaveBeenCalledTimes(1)
+    expect(resolve).toHaveBeenCalledTimes(2)
     expect(get.mock.calls.map(call => range(call[1]).start)).toEqual([
       0,
       ED2K_BATCH_SIZE,
     ])
 
-    logger.info('ED2K 单连接批次流水线验证完成')
+    logger.info('ED2K 双通道批次顺序验证完成')
   })
 
   /**
@@ -231,7 +243,7 @@ describe('calculateEd2k batched ranges', () => {
     const ranges = get.mock.calls.map(call => range(call[1]).start)
     expect(ranges.filter(start => start === 0)).toHaveLength(1)
     expect(ranges.filter(start => start === ED2K_BATCH_SIZE)).toHaveLength(2)
-    expect(resolve).toHaveBeenCalledTimes(2)
+    expect(resolve).toHaveBeenCalledTimes(3)
     expect(urls[1]).not.toBe(urls[2])
     expect(hashEd2kPart).toHaveBeenCalledTimes(5)
 
@@ -325,10 +337,10 @@ describe('calculateEd2k batched ranges', () => {
    * ============================================================================
    * 步骤6：验证非 206 刷新地址续算
    * ============================================================================
-   * 目标：CDN 临时返回非 206 时保留首批摘要并刷新单连接地址。
+   * 目标：双通道遇到非 206 时保留首批摘要并刷新单连接地址。
    * 数据源：首批成功、尾批返回 200、新地址返回标准 206 的请求桩。
    * 操作：
-   * 1) 单连接依次读取两个批次并让尾批返回 200
+   * 1) 双通道读取两个批次并让尾批返回 200
    * 2) 核对新连接只补算尾批次
    * 3) 核对首批摘要没有重复计算
    */
@@ -338,16 +350,18 @@ describe('calculateEd2k batched ranges', () => {
     // 6.1 首个地址完成首批后，在尾批返回非 206
     const size = ED2K_BATCH_SIZE + 1
     let connection = 0
+    let rejected = false
     const resolve = vi.fn(async () => ({
       url: `${SOURCE_URL}?connection=${++connection}`,
     }))
-    const get = vi.fn<IRequest['get']>(async (url, options) => {
+    const get = vi.fn<IRequest['get']>(async (_url, options) => {
       const value = range(options)
       const index = value.start / ED2K_BATCH_SIZE
-      const id = Number(new URL(url).searchParams.get('connection'))
-
-      if (id === 1 && index === 1)
+      if (index === 1 && !rejected) {
+        rejected = true
+        await vi.waitFor(() => expect(hashEd2kPart).toHaveBeenCalledTimes(4))
         return new Response('range rejected', { status: 200 })
+      }
 
       return response(
         bytes(value.end - value.start + 1, index === 0 ? 1 : 5),
@@ -366,7 +380,7 @@ describe('calculateEd2k batched ranges', () => {
     )
 
     // 6.3 首批不重复下载或哈希，进度状态复用同一组已完成摘要
-    expect(resolve).toHaveBeenCalledTimes(2)
+    expect(resolve).toHaveBeenCalledTimes(3)
     expect(get).toHaveBeenCalledTimes(3)
     expect(get.mock.calls.map(call => range(call[1]).start)).toEqual([
       0,
