@@ -36,7 +36,7 @@ export class FileItemModExtMenu extends FileItemModBase {
 
   /** 按钮配置 */
   get buttonConfig(): ButtonConfig[] {
-    return [
+    const buttons: ButtonConfig[] = [
       {
         class: '115-player',
         title: '使用【115官方播放器】',
@@ -57,8 +57,8 @@ export class FileItemModExtMenu extends FileItemModBase {
             {
               class: 'iina-player',
               title: '使用【iina】',
-              text: 'IINA',
-              icon: iinaIcon,
+              text: this.itemInfo.surface === 'legacy' ? '🎵 iina 播放' : 'IINA',
+              icon: this.itemInfo.surface === 'legacy' ? undefined : iinaIcon,
               visible: this.itemInfo.attributes.iv === IvType.Yes,
               click: async () => {
                 try {
@@ -104,6 +104,22 @@ export class FileItemModExtMenu extends FileItemModBase {
         },
       },
     ]
+
+    /*
+     * ================================================================================
+     * 步骤1：按页面原版顺序提供操作入口
+     * ================================================================================
+     * 目标：旧版播放入口保持 v0.5.0 顺序，新版维持当前 Fusion 顺序。
+     * 数据源：页面 surface 和新增 ED2K 操作。
+     * 操作：
+     * 1) 旧版先创建 ED2K，使 prepend 后落到原版播放入口之后
+     * 2) 新版沿用既有配置顺序
+     */
+    if (this.itemInfo.surface !== 'legacy')
+      return buttons
+
+    const ed2k = buttons[buttons.length - 1]
+    return ed2k ? [ed2k, ...buttons.slice(0, -1)] : buttons
   }
 
   /** 文件操作节点 */

@@ -12,6 +12,9 @@
             ? styles.container.officialPanelMain
             : styles.container.legacyMain,
     ]"
+    :style="props.variant === 'legacy'
+      ? { fontFamily: '\'PingFang SC\', \'Microsoft YaHei\', sans-serif' }
+      : undefined"
   >
     <div
       v-if="props.variant !== 'official' || extInfo.state.value"
@@ -23,17 +26,45 @@
     >
       <!-- 错误状态 -->
       <div v-if="props.variant !== 'official' && extInfo.error.value" :class="styles.states.error">
-        <LoadingError :message="extInfo.error.value" size="mini" />
+        <LoadingError
+          v-if="props.variant === 'legacy'"
+          :message="extInfo.error.value"
+        >
+          获取番号 [{{ props.avNumber }}] 失败
+        </LoadingError>
+        <LoadingError v-else :message="extInfo.error.value" size="mini" />
       </div>
 
       <!-- 加载骨架 -->
+      <template v-else-if="props.variant === 'legacy' && extInfo.isLoading.value">
+        <div :class="[styles.cover.container, styles.cover.legacy]" data-115master-legacy-cover-skeleton>
+          <div class="skeleton h-full w-full rounded-xl" />
+        </div>
+        <div :class="[styles.main.container, styles.main.legacy]" data-115master-legacy-info-skeleton>
+          <div class="skeleton h-6 w-4/5" />
+          <div :class="styles.skeleton.content">
+            <div :class="styles.skeleton.group">
+              <div
+                v-for="width in legacySkeletonWidths"
+                :key="width"
+                class="skeleton h-6"
+                :style="{ width }"
+              />
+            </div>
+          </div>
+        </div>
+      </template>
       <template v-else-if="props.variant !== 'official' && extInfo.isLoading.value">
         <div class="skeleton h-full w-full" />
       </template>
 
       <!-- 空状态 -->
       <div v-else-if="props.variant !== 'official' && !extInfo.state.value" :class="styles.states.empty">
-        <Empty :description="`未找到番号 [${props.avNumber}] 信息`" size="sm" />
+        <Empty
+          :description="`未找到番号 [${props.avNumber}] 信息`"
+          :size="props.variant === 'legacy' ? 'md' : 'sm'"
+          :style="props.variant === 'legacy' ? { padding: 0 } : undefined"
+        />
       </div>
 
       <!-- 内容 -->
@@ -83,10 +114,10 @@
               props.variant === 'legacy' && styles.content.legacy,
             ]"
           >
-            <div :class="[styles.content.group, props.variant === 'legacy' && styles.content.legacyGroup]">
+            <div :class="[styles.content.group, props.variant === 'legacy' && styles.content.legacyFirstGroup]">
               <div :class="[styles.item.container, props.variant === 'legacy' && styles.item.legacy]">
                 <span :class="[styles.item.label, props.variant === 'legacy' && styles.item.legacyLabel]">番号</span>
-                <span v-if="extInfo.state.value?.avNumber" :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">
+                <span v-if="extInfo.state.value?.avNumber" :class="[styles.item.value, props.variant !== 'legacy' && styles.item.compactValue, props.variant === 'legacy' && styles.item.legacyValue]">
                   <a
                     :href="extInfo.state.value?.detailUrl"
                     target="_blank"
@@ -96,30 +127,42 @@
                     {{ extInfo.state.value?.avNumber }}
                   </a>
                 </span>
-                <span v-else :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">-</span>
+                <span v-else :class="[styles.item.value, props.variant !== 'legacy' && styles.item.compactValue, props.variant === 'legacy' && styles.item.legacyValue]">-</span>
               </div>
 
               <div :class="[styles.item.container, props.variant === 'legacy' && styles.item.legacy, props.variant === 'legacy' ? styles.secondaryLegacy : styles.secondary]">
                 <span :class="[styles.item.label, props.variant === 'legacy' && styles.item.legacyLabel]">日期</span>
-                <span v-if="extInfo.state.value?.date" :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">
+                <span v-if="extInfo.state.value?.date" :class="[styles.item.value, props.variant !== 'legacy' && styles.item.compactValue, props.variant === 'legacy' && styles.item.legacyValue]">
                   {{ format.date(extInfo.state.value?.date) }}
                 </span>
-                <span v-else :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">-</span>
+                <span v-else :class="[styles.item.value, props.variant !== 'legacy' && styles.item.compactValue, props.variant === 'legacy' && styles.item.legacyValue]">-</span>
               </div>
 
               <div :class="[styles.item.container, props.variant === 'legacy' && styles.item.legacy, props.variant === 'legacy' ? styles.secondaryLegacy : styles.secondary]">
                 <span :class="[styles.item.label, props.variant === 'legacy' && styles.item.legacyLabel]">时长</span>
-                <span v-if="extInfo.state.value?.duration" :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">
+                <span v-if="extInfo.state.value?.duration" :class="[styles.item.value, props.variant !== 'legacy' && styles.item.compactValue, props.variant === 'legacy' && styles.item.legacyValue]">
                   {{ format.duration(extInfo.state.value?.duration) }}
                 </span>
-                <span v-else :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">-</span>
+                <span v-else :class="[styles.item.value, props.variant !== 'legacy' && styles.item.compactValue, props.variant === 'legacy' && styles.item.legacyValue]">-</span>
+              </div>
+
+              <div v-if="props.variant === 'legacy'" :class="[styles.item.container, styles.item.legacy]">
+                <span :class="[styles.item.label, styles.item.legacyLabel]">来源</span>
+                <a
+                  :class="[styles.item.value, styles.item.legacyValue, styles.item.link]"
+                  :href="extInfo.state.value?.baseUrl"
+                  target="_blank"
+                  data-115master-detail-source
+                >
+                  {{ extInfo.state.value?.source }}
+                </a>
               </div>
             </div>
 
-            <div :class="[styles.content.group, props.variant === 'legacy' && styles.content.legacyGroup]">
+            <div :class="[styles.content.group, props.variant === 'legacy' && styles.content.legacyOtherGroup]">
               <div :class="[styles.item.container, props.variant === 'legacy' && styles.item.legacy]">
                 <span :class="[styles.item.label, props.variant === 'legacy' && styles.item.legacyLabel]">演员</span>
-                <span v-if="extInfo.state.value?.actors" :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">
+                <span v-if="extInfo.state.value?.actors" :class="[styles.item.value, props.variant !== 'legacy' && styles.item.compactValue, props.variant === 'legacy' && styles.item.legacyValue]">
                   <a
                     v-for="actor in extInfo.state.value?.actors"
                     :key="actor.url"
@@ -131,12 +174,12 @@
                     {{ actor.name }}
                   </a>
                 </span>
-                <span v-else :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">-</span>
+                <span v-else :class="[styles.item.value, props.variant !== 'legacy' && styles.item.compactValue, props.variant === 'legacy' && styles.item.legacyValue]">-</span>
               </div>
 
               <div :class="[styles.item.container, props.variant === 'legacy' && styles.item.legacy, props.variant === 'legacy' ? styles.secondaryLegacy : styles.secondary]">
                 <span :class="[styles.item.label, props.variant === 'legacy' && styles.item.legacyLabel]">导演</span>
-                <span v-if="extInfo.state.value?.director" :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">
+                <span v-if="extInfo.state.value?.director" :class="[styles.item.value, props.variant !== 'legacy' && styles.item.compactValue, props.variant === 'legacy' && styles.item.legacyValue]">
                   <a
                     v-for="director in extInfo.state.value?.director"
                     :key="director.url"
@@ -148,12 +191,12 @@
                     {{ director.name }}
                   </a>
                 </span>
-                <span v-else :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">-</span>
+                <span v-else :class="[styles.item.value, props.variant !== 'legacy' && styles.item.compactValue, props.variant === 'legacy' && styles.item.legacyValue]">-</span>
               </div>
 
               <div v-if="extInfo.state.value?.category" :class="[styles.item.container, props.variant === 'legacy' && styles.item.legacy, props.variant === 'legacy' ? styles.secondaryLegacy : styles.secondary]">
                 <span :class="[styles.item.label, props.variant === 'legacy' && styles.item.legacyLabel]">分类</span>
-                <span v-if="extInfo.state.value?.category" :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">
+                <span v-if="extInfo.state.value?.category" :class="[styles.item.value, props.variant !== 'legacy' && styles.item.compactValue, props.variant === 'legacy' && styles.item.legacyValue]">
                   <a
                     v-for="category in extInfo.state.value?.category"
                     :key="category.url"
@@ -165,7 +208,7 @@
                     {{ category.name }}
                   </a>
                 </span>
-                <span v-else :class="[styles.item.value, props.variant === 'legacy' && styles.item.legacyValue]">-</span>
+                <span v-else :class="[styles.item.value, props.variant !== 'legacy' && styles.item.compactValue, props.variant === 'legacy' && styles.item.legacyValue]">-</span>
               </div>
             </div>
           </div>
@@ -207,6 +250,7 @@ const props = withDefaults(defineProps<{
   variant: 'legacy',
 })
 const logger = appLogger.sub('ExtInfo')
+const legacySkeletonWidths = ['72%', '88%', '64%', '80%']
 
 /** 样式常量定义 */
 const styles = clsx({
@@ -231,7 +275,7 @@ const styles = clsx({
   cover: {
     container: 'flex h-24 w-36 items-center justify-center',
     drive: 'hidden',
-    legacy: '!h-[180px] !w-[267px] shrink-0 overflow-hidden rounded-xl shadow-lg',
+    legacy: '!h-[180px] !w-[267.65px] shrink-0 overflow-hidden rounded-xl [box-shadow:0_0_10px_1px_rgba(0,0,0,0.1)]',
     link: 'block h-full w-full',
   },
   // 主要内容样式
@@ -252,13 +296,15 @@ const styles = clsx({
     drive: 'ml-0 grid grid-cols-1 gap-1 sm:grid-cols-2',
     group: 'flex min-w-32 flex-col gap-0.5',
     legacy: '!ml-0 !gap-6',
-    legacyGroup: '!min-w-40 !gap-3',
+    legacyFirstGroup: '!min-w-40 !gap-3',
+    legacyOtherGroup: '!min-w-0 !gap-3',
   },
   // 项目样式
   item: {
     container: 'flex items-start gap-2 text-xs',
     label: 'text-base-content/70 h-5 w-8 shrink-0',
-    value: 'text-base-content/70 line-clamp-1 flex flex-1 flex-wrap gap-2',
+    value: 'text-base-content/70 flex flex-1 flex-wrap gap-2',
+    compactValue: 'line-clamp-1',
     link: 'hover:text-primary transition-colors hover:underline',
     badge: 'bg-base-200 hover:bg-base-200 rounded px-1 py-[1px] text-xs',
     legacy: '!gap-3',
@@ -268,6 +314,10 @@ const styles = clsx({
   // 次要信息样式
   secondary: 'opacity-60',
   secondaryLegacy: 'opacity-100',
+  skeleton: {
+    content: 'flex flex-1 items-start',
+    group: 'flex w-full flex-col gap-3',
+  },
   // 元信息样式
   meta: {
     avNumber: 'text-base-content/40 absolute right-4 bottom-2 text-xs',

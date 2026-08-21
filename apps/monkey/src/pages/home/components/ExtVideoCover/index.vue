@@ -20,7 +20,11 @@
     >
       <!-- 错误状态 -->
       <div v-if="props.variant !== 'official' && videoCover.error" :class="styles.states.error">
-        <LoadingError size="mini" :message="videoCover.error" />
+        <LoadingError
+          :size="props.variant === 'legacy' ? 'medium' : 'mini'"
+          :message="videoCover.error"
+          :style="props.variant === 'legacy' ? { margin: '0 auto' } : undefined"
+        />
       </div>
 
       <!-- 骨架屏 -->
@@ -38,12 +42,15 @@
         <a
           v-for="(thumbnail, index) in videoCover.state"
           :key="index"
-          :class="[styles.cover.thumbItem, props.variant === 'legacy' && styles.cover.legacyThumbItem]"
+          :class="[
+            styles.cover.thumbItem,
+            props.variant === 'legacy' ? styles.cover.legacyThumbItem : styles.cover.officialThumbItem,
+          ]"
           @click.prevent.stop="openPhotoSwipe(index)"
         >
           <img
             :src="thumbnail.img"
-            :alt="`视频封面 ${index + 1}`"
+            :alt="`${props.variant === 'legacy' ? '预览图' : '视频封面'} ${index + 1}`"
             :class="[styles.cover.thumbImage, props.variant === 'legacy' && styles.cover.legacyThumbImage]"
           >
         </a>
@@ -71,8 +78,8 @@ const props = withDefaults(defineProps<{
   variant: 'legacy',
 })
 
-/** 文件列表视频封面数量 */
-const FILELIST_VIDEO_COVER_NUM = 5
+/** 旧版文件列表预览帧数量，保持横向 150px 预览的密度。 */
+const FILELIST_VIDEO_COVER_NUM = 8
 
 /** 样式常量定义 */
 const styles = clsx({
@@ -98,14 +105,14 @@ const styles = clsx({
     container: [
       'flex h-full w-full overflow-hidden select-none',
     ],
-    legacyContainer: 'justify-center gap-px overflow-x-auto',
+    legacyContainer: 'justify-center gap-px overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
     thumbItem: [
-      'aspect-video h-full',
-      'overflow-hidden',
+      'h-full',
       'cursor-zoom-in no-underline',
       'transition-opacity hover:opacity-90',
     ],
-    legacyThumbItem: '!h-[150px]',
+    officialThumbItem: 'aspect-video overflow-hidden',
+    legacyThumbItem: '!h-[150px] !w-auto',
     thumbImage: ['h-full w-full object-contain object-center align-top'],
     legacyThumbImage: '!h-[150px] !w-auto !object-cover',
   },
@@ -148,7 +155,7 @@ function initPhotoSwipe() {
       src: item.img,
       width: item.width,
       height: item.height,
-      alt: '视频封面',
+      alt: props.variant === 'legacy' ? '预览图' : '视频封面',
     })),
     showHideAnimationType: 'fade',
     pswpModule: PhotoSwipe,

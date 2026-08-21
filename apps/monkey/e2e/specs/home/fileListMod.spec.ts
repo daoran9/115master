@@ -31,6 +31,25 @@ test.describe('FileListMod', () => {
     const ed2kBtn = page.locator('li[iv="1"] a.ed2k-link').first()
     await expect(ed2kBtn).toHaveAttribute('title', '生成 ED2K 链')
     await expect(ed2kBtn).toHaveText('ED2K')
+
+    /*
+     * ================================================================================
+     * 步骤1：核对旧版操作入口顺序
+     * ================================================================================
+     * 目标：新增 ED2K 不改变 v0.5.0 的 Master 与官方播放优先级。
+     * 数据源：首个视频文件行的 .file-opr 子节点。
+     * 操作：
+     * 1) 保留 Master、官方播放的原版顺序
+     * 2) 把 ED2K 放在播放入口之后、原生下载之前
+     */
+    logger.info('开始核对旧版操作入口顺序')
+
+    /** 1.1 Windows 回归环境没有 IINA，顺序应为两个原版播放入口、新增 ED2K、原生下载。 */
+    await expect.poll(() => page.locator('li[iv="1"] .file-opr').first().locator(':scope > a').evaluateAll(nodes =>
+      nodes.map(node => node.getAttribute('class') || node.getAttribute('menu')),
+    )).toEqual(['master-player', '115-player', 'ed2k-link', 'download_one'])
+
+    logger.info('旧版操作入口顺序核对完成')
     await ed2kBtn.click()
     const ed2kDialog = page.locator('[data-115master-ed2k-dialog]')
     await expect(ed2kDialog.locator('.name')).toHaveText('演示视频 01.mp4')
@@ -41,7 +60,7 @@ test.describe('FileListMod', () => {
     await expect(page.locator('li.with-ext-video-cover')).toHaveCount(40)
     const coverRoot = page.locator('li.with-ext-video-cover .ext-video-cover-root').first()
     await expect(coverRoot).toBeAttached()
-    await expect(coverRoot).toHaveAttribute('data-theme', 'dark')
+    await expect(coverRoot).toHaveAttribute('data-theme', 'light')
 
     // 文件夹 a 标签链接重写为可新标签打开的目录链接（FileItemModFolderLink）
     await expect(page.locator('li[title="动漫"] .file-name a'))
@@ -218,6 +237,36 @@ test.describe('FileListMod', () => {
     ])
     const cover = page.locator('li[pick_code="monoCoverPick"] [data-115master-detail] .ext-info-root img')
     await expect(cover).toBeVisible()
+
+    /*
+     * ================================================================================
+     * 步骤2：核对旧版详情卡原版结构
+     * ================================================================================
+     * 目标：Fusion 数据源扩展不改变 v0.5.0 详情卡的字段、尺寸和浅色外观。
+     * 数据源：ABP-123 已加载详情与 Shadow DOM 计算样式。
+     * 操作：
+     * 1) 核对来源行和浅色主题
+     * 2) 核对原版卡片与封面尺寸
+     */
+    logger.info('开始核对旧版详情卡原版结构')
+
+    /** 2.1 来源保留在原版第一列，链接指向本次融合采用的主资料源。 */
+    const detail = page.locator('li[pick_code="monoCoverPick"] [data-115master-detail]')
+    const root = detail.locator('.ext-info-root')
+    const source = root.locator('[data-115master-detail-source]')
+    await expect(root).toHaveAttribute('data-theme', 'light')
+    await expect(source).toHaveText('JavBus')
+    await expect(source).toHaveAttribute('href', /^https:\/\/www\.javbus\.com\/?$/)
+
+    /** 2.2 卡片、封面和列间距沿用 v0.5.0，封面来源选择仍使用 Fusion 的 DMM 优先逻辑。 */
+    const card = root.locator(':scope > div')
+    const coverBox = root.locator('a').first().locator('..')
+    await expect(card).toHaveCSS('background-color', 'rgb(248, 248, 250)')
+    await expect(card).toHaveCSS('border-radius', '16px')
+    await expect(coverBox).toHaveCSS('width', '267.641px')
+    await expect(coverBox).toHaveCSS('height', '180px')
+
+    logger.info('旧版详情卡原版结构核对完成')
 
     /** 1.2 实体图成功后不再请求 FANZA 查询或 JavBus 后备图片。 */
     const requests = await gmRequests(page)
@@ -413,7 +462,7 @@ test.describe('FileListMod', () => {
     // 1.2 官方竖图完整缩放，原有 JavBus 图片不再请求。
     await expect(cover).toBeVisible()
     await expect(cover).toHaveCSS('object-fit', 'contain')
-    await expect(cover).toHaveCSS('width', '267px')
+    await expect(cover).toHaveCSS('width', '267.641px')
     await expect(cover).toHaveCSS('height', '180px')
     expect(queries).toEqual(['HMDNV-767', '竖版封面回归'])
     const requests = await gmRequests(page)

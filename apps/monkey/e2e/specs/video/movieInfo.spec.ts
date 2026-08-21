@@ -77,6 +77,44 @@ test.describe('播放器影片详情图片', () => {
           })
           return true
         })
+        api.override(/^https:\/\/api\.video\.dmm\.co\.jp\/graphql/, async ({ route }) => {
+          await route.fulfill({
+            contentType: 'application/json',
+            headers: CORS,
+            json: {
+              data: {
+                legacySearchPPV: {
+                  result: {
+                    contents: [{
+                      id: 'e2ejac00089',
+                      title: 'JAC-089 图片回归',
+                      packageImage: {
+                        largeUrl: 'https://images.e2e.local/fanza-cover.jpg',
+                      },
+                    }],
+                  },
+                },
+              },
+            },
+          })
+          return true
+        })
+        api.override(/^https:\/\/(?:pics\.dmm\.co\.jp\/digital|awsimgsrc\.dmm\.co\.jp\/pics_dig\/digital)\/video\//, async ({ route, url }) => {
+          images.push(url.href)
+          if (url.href === 'https://pics.dmm.co.jp/digital/video/e2ejac00089/e2ejac00089jp-1.jpg') {
+            await route.fulfill({
+              contentType: 'image/png',
+              body: Buffer.concat([
+                Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADklEQVR4nGP4z8DwHwQBEPgD/U6VwW8AAAAASUVORK5CYII=', 'base64'),
+                Buffer.alloc(6000),
+              ]),
+              headers: CORS,
+            })
+            return true
+          }
+          await route.fulfill({ status: 403, body: 'unavailable', headers: CORS })
+          return true
+        })
         api.override(/^https:\/\/c0\.jdbstatic\.com\/avatars\//, async ({ route, url }) => {
           images.push(url.href)
           await route.fulfill({ status: 403, body: 'forbidden', headers: CORS })
@@ -107,11 +145,12 @@ test.describe('播放器影片详情图片', () => {
      * ================================================================================
      * 步骤1：验证播放器详情图片链
      * ================================================================================
-     * 目标：跨域图片不再走原生 URL，失败剧照也不保留空白格。
-     * 数据源：一张演员头像、一张有效缩略图和一张 403 缩略图。
+     * 目标：优先显示官方高清图，放大层复用 Blob，失败剧照不保留空白格。
+     * 数据源：一张 FANZA/DMM 官方剧照、资料源回退图和一张 403 剧照。
      * 操作：
      * 1) 等待 JavDB 详情与图片请求完成
-     * 2) 核对头像显示、缩略图优先和失败剧照隐藏
+     * 2) 核对官方图优先、原图回退和失败剧照隐藏
+     * 3) 点击剧照后核对 PhotoSwipe 不再直连外站
      */
     console.info('[e2e] 开始核对播放器详情图片链')
 
@@ -131,24 +170,28 @@ test.describe('播放器影片详情图片', () => {
     const crossSourceFallback = page.locator('a[href="https://images.e2e.local/raw-failed.jpg"]')
     await valid.scrollIntoViewIfNeeded()
     await expect(valid).toBeVisible()
-    await expect(valid.locator('img')).toHaveAttribute('data-origin-src', 'https://images.e2e.local/thumb-ok.jpg')
+    await expect(valid.locator('img')).toHaveAttribute('data-origin-src', 'https://images.e2e.local/raw-ok.jpg')
+    await expect(valid.locator('img')).toHaveAttribute('src', /^blob:/)
     await expect(gmFallback).toBeVisible()
     await expect(gmFallback.locator('img')).toHaveAttribute('src', /^blob:/)
     await expect(nativeFallback).toBeVisible()
-    await expect(nativeFallback.locator('img')).toHaveAttribute('src', 'https://images.e2e.local/thumb-native.jpg')
+    await expect(nativeFallback.locator('img')).toHaveAttribute('src', 'https://images.e2e.local/raw-native.jpg')
     await expect(crossSourceFallback).toBeVisible()
     await expect(crossSourceFallback.locator('img'))
       .toHaveAttribute('src', /^blob:/)
-    expect(images).toContain('https://images.e2e.local/thumb-ok.jpg')
-    expect(images).toContain('https://images.e2e.local/thumb-fallback.jpg')
+    expect(images).toContain('https://pics.dmm.co.jp/digital/video/e2ejac00089/e2ejac00089jp-1.jpg')
     expect(images).toContain('https://images.e2e.local/raw-fallback.jpg')
-    expect(images).toContain('https://images.e2e.local/thumb-native.jpg')
     expect(images).toContain('https://images.e2e.local/raw-native.jpg')
-    expect(images).toContain('https://images.e2e.local/thumb-failed.jpg')
     expect(images).toContain('https://images.e2e.local/raw-failed.jpg')
-    expect(images).toContain('https://images.e2e.local/bus-thumb-4.jpg')
-    expect(images).not.toContain('https://images.e2e.local/bus-thumb-1.jpg')
+    expect(images).toContain('https://images.e2e.local/bus-raw-4.jpg')
+    expect(images).not.toContain('https://images.e2e.local/thumb-ok.jpg')
     expect(images).not.toContain('https://images.e2e.local/raw-ok.jpg')
+
+    /** 1.3 PhotoSwipe 使用当前 Image 组件已加载的 Blob，不请求 a.href 的远程原图。 */
+    await valid.click()
+    await expect(page.locator('.pswp')).toHaveClass(/pswp--open/)
+    await expect(page.locator('.pswp__img')).toHaveAttribute('src', /^blob:/)
+    await page.keyboard.press('Escape')
 
     console.info('[e2e] 播放器详情图片链核对完成')
     expect(errors).toEqual([])

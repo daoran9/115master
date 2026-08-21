@@ -186,6 +186,7 @@ export class FileItemModExtInfo extends FileItemModBase {
     extInfoDom.className = 'ext-info-root'
     const appRoot = this.container.ownerDocument.getElementById('my-app')
     const theme = this.itemInfo.surface === 'official'
+      || this.itemInfo.surface === 'legacy'
       ? 'light'
       : appRoot?.getAttribute('data-theme') || 'dark'
     extInfoDom.setAttribute('data-theme', theme)

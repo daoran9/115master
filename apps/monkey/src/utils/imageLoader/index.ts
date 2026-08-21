@@ -1,5 +1,5 @@
-export { createFanzaCoverLoader } from './fanza'
-export type { FanzaCoverLoaderOptions } from './fanza'
+export { createFanzaCoverLoader, createFanzaPreviewLoader } from './fanza'
+export type { FanzaCoverLoaderOptions, FanzaPreviewLoaderOptions } from './fanza'
 export { createGMImageFallbackLoader, createGMImageLoader } from './gm'
 export type { GMImageCandidate } from './gm'
 export type { ImageLoader, ImageResource } from './types'

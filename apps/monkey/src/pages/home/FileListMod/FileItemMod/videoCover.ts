@@ -143,6 +143,7 @@ export class FileItemModVideoCover extends FileItemModBase {
     root.className = 'ext-video-cover-root'
     const appRoot = this.container.ownerDocument.getElementById('my-app')
     const theme = this.itemInfo.surface === 'official'
+      || this.itemInfo.surface === 'legacy'
       ? 'light'
       : appRoot?.getAttribute('data-theme') || 'dark'
     root.setAttribute('data-theme', theme)

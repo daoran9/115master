@@ -210,12 +210,17 @@
               v-if="!failedPreviews.has(getPreviewKey(item, index))"
               :class="styles.thumbnails.item"
               :href="item.raw || item.thumbnail"
-              target="_blank"
             >
               <Image
-                :src="item.thumbnail || item.raw || ''"
+                :src="item.raw || item.thumbnail || ''"
                 alt="剧照"
-                :loader="getPreviewLoader(item, index, movieInfo.state.value?.detailUrl)"
+                :loader="getPreviewLoader(
+                  item,
+                  index,
+                  movieInfo.state.value?.avNumber,
+                  movieInfo.state.value?.title,
+                  movieInfo.state.value?.detailUrl,
+                )"
                 :fallback="getPreviewFallback(item, index, movieInfo.state.value?.detailUrl, getPreviewKey(item, index))"
                 class="size-full"
                 fit="cover"
@@ -247,7 +252,7 @@ import {
 } from '@/components'
 import { Image } from '@/components/Image'
 import { clsx } from '@/utils/clsx'
-import { createGMImageFallbackLoader } from '@/utils/imageLoader'
+import { createFanzaPreviewLoader, createGMImageFallbackLoader } from '@/utils/imageLoader'
 import { appLogger } from '@/utils/logger'
 import { hasActorFace, normalizeActorName } from '../../data/actorFaces'
 import CopyButton from './components/CopyButton.vue'
@@ -452,9 +457,9 @@ interface PreviewImageData {
   thumbnail?: string
 }
 
-/** 返回缩略图优先、原图后备的去重地址。 */
+/** 返回原图优先、缩略图后备的去重地址。 */
 function getPreviewUrls(item: PreviewImageData) {
-  return Array.from(new Set([item.thumbnail, item.raw].filter(Boolean))) as string[]
+  return Array.from(new Set([item.raw, item.thumbnail].filter(Boolean))) as string[]
 }
 
 /** 合并当前来源和其他资料源中同序号的剧照候选。 */
@@ -481,12 +486,23 @@ function getPreviewCandidates(item: PreviewImageData, index: number, referer?: s
   }))
 }
 
-/** 剧照依次尝试当前来源和其他资料源的同序号图片。 */
-function getPreviewLoader(item: PreviewImageData, index: number, referer?: string) {
+/** 剧照优先尝试 FANZA/DMM 官方图片，再回退当前和其他资料源。 */
+function getPreviewLoader(
+  item: PreviewImageData,
+  index: number,
+  avNumber?: string,
+  title?: string,
+  referer?: string,
+) {
   const candidates = getPreviewCandidates(item, index, referer)
-  return candidates.length
-    ? createGMImageFallbackLoader(candidates, { timeoutMs: 3000, transform: false })
-    : undefined
+  if (!candidates.length || !avNumber)
+    return undefined
+  return createFanzaPreviewLoader({
+    avNumber,
+    title,
+    index,
+    fallbacks: candidates,
+  })
 }
 
 /** GM 图片链失败后用无 Referer 原生图片逐项回退。 */
@@ -600,8 +616,26 @@ watch(movieInfoThumb, async () => {
   })
   lightbox.value.init()
   lightbox.value.addFilter('domItemData', (itemData, element) => {
-    itemData.width = element.querySelector('img')?.naturalWidth
-    itemData.height = element.querySelector('img')?.naturalHeight
+    /*
+     * ================================================================================
+     * 步骤2：复用已加载的剧照打开大图
+     * ================================================================================
+     * 目标：PhotoSwipe 使用 GM 成功取得的 Blob，不再无 Referer 直连外站原图。
+     * 数据源：当前剧照节点内已经完成加载的 img。
+     * 操作：
+     * 1) 用 currentSrc 覆盖远程 href
+     * 2) 同步真实尺寸供 PhotoSwipe 计算缩放
+     */
+    logger.info('开始准备播放器剧照大图')
+
+    /** 2.1 Blob 或原生回退地址均以实际显示结果为准。 */
+    const image = element.querySelector('img')
+    if (image?.currentSrc || image?.src)
+      itemData.src = image.currentSrc || image.src
+    itemData.width = image?.naturalWidth
+    itemData.height = image?.naturalHeight
+
+    logger.info('播放器剧照大图准备完成', itemData.src)
     return itemData
   })
 })
