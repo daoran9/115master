@@ -6,8 +6,8 @@
   font-size: 12px;
   border-radius: 4px;
   margin: auto 9px auto -6px;
-  background-color: var(--color-base-200);
-  color: var(--color-base-content);
+  background-color: #f2f4f8;
+  color: #666;
   vertical-align: middle;
   flex-shrink: 0;
   &:hover {

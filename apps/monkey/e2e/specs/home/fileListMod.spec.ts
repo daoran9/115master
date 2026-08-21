@@ -552,6 +552,8 @@ test.describe('FileListMod', () => {
     await expect(avatar).toHaveCSS('width', '50px')
     await expect(avatar).toHaveCSS('height', '50px')
     await expect(avatar).toHaveCSS('border-radius', '50%')
+    await expect(avatar).toHaveCSS('border-top-color', 'rgb(241, 241, 241)')
+    await expect(avatar).toHaveCSS('background-color', 'rgb(241, 241, 241)')
     await expect(avatar).toHaveCSS('object-fit', 'cover')
     await expect.poll(async () => row.evaluate(element =>
       element.getBoundingClientRect().height,

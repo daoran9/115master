@@ -98,8 +98,8 @@ export class TopHeaderMod extends BaseMod {
             <i class="icon-operate ifo-linktask"></i>
             <span>云下载</span>
         `
-    button.style.background = 'var(--official-theme)'
-    button.style.borderColor = 'var(--official-theme)'
+    button.style.background = '#3a4783'
+    button.style.borderColor = '#3a4783'
     button.style.color = '#fff'
     button.onclick = () => {
       openOfflineTask()

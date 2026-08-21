@@ -20,6 +20,8 @@ test.describe('TopHeaderMod', () => {
     await expect(offline).toBeAttached()
     await expect(offline).toContainText('云下载')
     await expect(offline.locator('i.icon-operate.ifo-linktask')).toBeAttached()
+    await expect(offline).toHaveCSS('background-color', 'rgb(58, 71, 131)')
+    await expect(offline).toHaveCSS('border-color', 'rgb(58, 71, 131)')
     await expect(page.locator('#js_top_panel_box > div > a:first-child')).toHaveClass(/master-offline-task-btn/)
 
     // 官方云下载按钮被移除

@@ -46,6 +46,8 @@ test.describe('TopFilePathMod', () => {
     const back = page.locator('.master-back-button')
     await expect(back).toBeAttached()
     await expect(back).toContainText('返回目录')
+    await expect(back).toHaveCSS('background-color', 'rgb(242, 244, 248)')
+    await expect(back).toHaveCSS('color', 'rgb(102, 102, 102)')
 
     // 点击返回按钮 = 点击倒数第二个路径链接（此处为根目录链接）
     await page.evaluate(() => {
