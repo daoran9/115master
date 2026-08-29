@@ -58,6 +58,13 @@ const ADDON_SELECTOR = '[data-115master-row-addon]'
 const DETAIL_SELECTOR = '[data-115master-detail]'
 const PREVIEW_SELECTOR = '[data-115master-preview]'
 const ACTIONS_SELECTOR = '[data-115master-native-actions]'
+const MERGED_ACTIONS_SELECTOR = '[data-115master-merged-actions]'
+const ACTIONS_ATTRIBUTE = 'data-115master-native-actions'
+const MERGED_ACTIONS_ATTRIBUTE = 'data-115master-merged-actions'
+const NATIVE_ACTION_GROUP_ATTRIBUTE = 'data-115master-native-action-group'
+const NATIVE_MENU_ATTRIBUTE = 'data-115master-native-menu'
+const ACTION_MODE_ATTRIBUTE = 'data-115master-action-mode'
+const ADDED_FILE_OPR_ATTRIBUTE = 'data-115master-added-file-opr'
 const ACTRESS_SELECTOR = '[data-115master-actress]'
 const ACTRESS_HOST_ATTRIBUTE = 'data-115master-actress-host'
 const ACTRESS_INLINE_ATTRIBUTE = 'data-115master-actress-inline'
@@ -648,7 +655,7 @@ export class NewOfficialFileListMod {
     }
 
     const attributes = toLegacyFileAttributes(item)
-    this.createActions(addon, attributes.file_type)
+    this.createActions(addon, attributes.file_type, row)
 
     const scrollBox = this.findScrollBox(row)
     const itemInfo: ItemInfo = {
@@ -986,7 +993,11 @@ export class NewOfficialFileListMod {
   }
 
   /** 创建旧版菜单和下载增强依赖的兼容操作栏。 */
-  private createActions(addon: HTMLElement, fileType: FileType): void {
+  private createActions(
+    addon: HTMLElement,
+    fileType: FileType,
+    row?: HTMLElement,
+  ): void {
     /*
      * ================================================================================
      * 步骤3.2：创建插件独立下载入口
@@ -999,6 +1010,21 @@ export class NewOfficialFileListMod {
      */
     this.logger.info('开始创建新版文件下载入口', fileType)
 
+    const nativeActions = row ? this.findNativeActions(row) : null
+    if (nativeActions) {
+      addon.setAttribute(ACTION_MODE_ATTRIBUTE, 'merged')
+      nativeActions.setAttribute(ACTIONS_ATTRIBUTE, '')
+      nativeActions.setAttribute(MERGED_ACTIONS_ATTRIBUTE, '')
+      if (!nativeActions.classList.contains('file-opr')) {
+        nativeActions.classList.add('file-opr')
+        nativeActions.setAttribute(ADDED_FILE_OPR_ATTRIBUTE, '')
+      }
+      this.markNativeActionGroup(nativeActions)
+      this.logger.info('新版文件操作入口并入原生悬停条', fileType)
+      return
+    }
+
+    addon.setAttribute(ACTION_MODE_ATTRIBUTE, 'standalone')
     const actions = document.createElement('div')
     actions.className = 'file-opr'
     actions.setAttribute('data-115master-native-actions', '')
@@ -1013,6 +1039,57 @@ export class NewOfficialFileListMod {
     actions.append(download)
     addon.append(actions)
     this.logger.info('新版文件下载入口创建完成', fileType)
+  }
+
+  /** 查找新版原生文件行的悬停操作条。 */
+  private findNativeActions(row: HTMLElement): HTMLElement | null {
+    this.logger.info('开始定位新版原生悬停操作条')
+    const result = Array.from(row.querySelectorAll<HTMLElement>(
+      '[class*="group-hover:flex"], [role="toolbar"]',
+    )).find((candidate) => {
+      if (candidate.closest(ADDON_SELECTOR))
+        return false
+      return Boolean(candidate.querySelector('button[title="下载"], button[title="更多"]'))
+    }) ?? null
+    this.logger.info('新版原生悬停操作条定位完成', Boolean(result))
+    return result
+  }
+
+  /** 标记原生操作按钮组，供 Fusion 入口插入同一行并统一排序。 */
+  private markNativeActionGroup(nativeActions: HTMLElement): void {
+    /*
+     * ================================================================================
+     * 步骤3.3：标记新版原生操作按钮组
+     * ================================================================================
+     * 目标：让 Fusion 入口和新版原生按钮进入同一条视觉操作栏。
+     * 数据源：原生悬停条内部的 data-menu-action 包裹节点。
+     * 操作：
+     * 1) 标记原生按钮分组
+     * 2) 为原生菜单写入稳定标题，供 CSS 恢复旧版顺序
+     */
+    this.logger.info('开始标记新版原生操作按钮组')
+
+    const group = Array.from(nativeActions.children)
+      .map(node => node as HTMLElement)
+      .find(node => Array.from(node.children).some(child => (
+        child instanceof HTMLElement
+        && child.hasAttribute('data-menu-action')
+      )))
+    if (!group) {
+      this.logger.info('新版原生操作按钮组标记跳过，无嵌套分组')
+      return
+    }
+
+    group.setAttribute(NATIVE_ACTION_GROUP_ATTRIBUTE, '')
+    Array.from(group.children).forEach((node) => {
+      if (!(node instanceof HTMLElement))
+        return
+      const button = node.querySelector<HTMLButtonElement>('button[title]')
+      const label = button?.getAttribute('title')?.trim()
+      if (label)
+        node.setAttribute(NATIVE_MENU_ATTRIBUTE, label)
+    })
+    this.logger.info('新版原生操作按钮组标记完成')
   }
 
   /** 卸载一行增强，并清理适配标记。 */
@@ -1056,10 +1133,23 @@ export class NewOfficialFileListMod {
     row.querySelectorAll([
       DETAIL_SELECTOR,
       PREVIEW_SELECTOR,
-      ACTIONS_SELECTOR,
+      `${ACTIONS_SELECTOR}:not(${MERGED_ACTIONS_SELECTOR})`,
       ACTRESS_SELECTOR,
       GRID_TOGGLE_SELECTOR,
     ].join(',')).forEach(node => node.remove())
+    row.querySelectorAll<HTMLElement>(MERGED_ACTIONS_SELECTOR).forEach((node) => {
+      node.removeAttribute(ACTIONS_ATTRIBUTE)
+      node.removeAttribute(MERGED_ACTIONS_ATTRIBUTE)
+      if (node.hasAttribute(ADDED_FILE_OPR_ATTRIBUTE)) {
+        node.classList.remove('file-opr')
+        node.removeAttribute(ADDED_FILE_OPR_ATTRIBUTE)
+      }
+    })
+    row.querySelectorAll<HTMLElement>(`[${NATIVE_ACTION_GROUP_ATTRIBUTE}]`).forEach((node) => {
+      node.removeAttribute(NATIVE_ACTION_GROUP_ATTRIBUTE)
+      node.querySelectorAll<HTMLElement>(`[${NATIVE_MENU_ATTRIBUTE}]`)
+        .forEach(menu => menu.removeAttribute(NATIVE_MENU_ATTRIBUTE))
+    })
     row.querySelectorAll<HTMLElement>(`[${ACTRESS_HOST_ATTRIBUTE}]`).forEach((host) => {
       host.classList.remove('with-actress-info')
       host.removeAttribute(ACTRESS_HOST_ATTRIBUTE)
@@ -1109,7 +1199,7 @@ export class NewOfficialFileListMod {
     const previews = Array.from(
       enhanced.addon.querySelectorAll<HTMLElement>(PREVIEW_SELECTOR),
     )
-    const actions = enhanced.addon.querySelectorAll(ACTIONS_SELECTOR)
+    const actions = row.querySelectorAll(ACTIONS_SELECTOR)
     const addonActresses = enhanced.addon.querySelectorAll(ACTRESS_SELECTOR)
     const inlineActresses = Array.from(
       row.querySelectorAll<HTMLElement>(ACTRESS_SELECTOR),
@@ -1124,7 +1214,7 @@ export class NewOfficialFileListMod {
     const legacy = Array.from(row.querySelectorAll<HTMLElement>([
       DETAIL_SELECTOR,
       PREVIEW_SELECTOR,
-      ACTIONS_SELECTOR,
+      `${ACTIONS_SELECTOR}:not(${MERGED_ACTIONS_SELECTOR})`,
     ].join(','))).filter(node => !enhanced.addon.contains(node))
     const expectsDetail = Boolean(
       userSettings.value.enableAvInfo
@@ -1137,6 +1227,8 @@ export class NewOfficialFileListMod {
     const expectsPreview = userSettings.value.enableFilelistPreview
       && attributes.iv === IvType.Yes
     const expectsActions = true
+    const expectsMergedActions = enhanced.addon.getAttribute(ACTION_MODE_ATTRIBUTE) === 'merged'
+    const hasNativeActions = Boolean(this.findNativeActions(row))
 
     return enhanced.addon.isConnected
       && enhanced.addon.parentElement === row
@@ -1148,6 +1240,9 @@ export class NewOfficialFileListMod {
       && details.length === Number(expectsDetail)
       && previews.length === Number(expectsPreview)
       && actions.length === Number(expectsActions)
+      && (!expectsActions
+        || row.querySelectorAll(MERGED_ACTIONS_SELECTOR).length === Number(expectsMergedActions))
+      && (!expectsActions || hasNativeActions === expectsMergedActions)
       && (!expectsDetail
         || details[0]?.getAttribute('data-115master-av-number') === avNumber)
       && (!expectsPreview

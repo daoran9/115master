@@ -5,6 +5,7 @@ import { is115Browser } from '@/utils/platform'
 import { FileItemModBase } from './base'
 
 const logger = appLogger.sub('FileItemModDownload')
+const NATIVE_ACTION_GROUP_SELECTOR = '[data-115master-native-action-group]'
 
 /**
  * FileItemMod 文件下载
@@ -14,7 +15,13 @@ export class FileItemModDownload extends FileItemModBase {
   private previousFileOnClick: GlobalEventHandlers['onclick'] = null
 
   get fileOprNode() {
-    return this.itemNode.querySelector<HTMLElement>('.file-opr')
+    const interactionRoot = this.itemInfo.surface === 'official'
+      ? this.itemInfo.interactionNode ?? this.itemNode
+      : this.itemNode
+    const mergedActions = interactionRoot.querySelector<HTMLElement>('[data-115master-merged-actions]')
+    return mergedActions?.querySelector<HTMLElement>(NATIVE_ACTION_GROUP_SELECTOR)
+      ?? mergedActions
+      ?? this.itemNode.querySelector<HTMLElement>('.file-opr')
   }
 
   get downloadOneNode() {

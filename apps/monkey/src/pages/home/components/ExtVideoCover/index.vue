@@ -15,7 +15,7 @@
       v-if="props.variant !== 'official' || videoCover.isReady"
       :class="[
         styles.container.content,
-        props.variant === 'legacy' && styles.container.legacyContent,
+        isLegacyVisual && styles.container.legacyContent,
       ]"
     >
       <!-- 错误状态 -->
@@ -37,21 +37,21 @@
         v-else-if="videoCover.isReady"
         :id="`gallery-${props.pickCode}`"
         class="pswp-gallery"
-        :class="[styles.cover.container, props.variant === 'legacy' && styles.cover.legacyContainer]"
+        :class="[styles.cover.container, isLegacyVisual && styles.cover.legacyContainer]"
       >
         <a
           v-for="(thumbnail, index) in videoCover.state"
           :key="index"
           :class="[
             styles.cover.thumbItem,
-            props.variant === 'legacy' ? styles.cover.legacyThumbItem : styles.cover.officialThumbItem,
+            isLegacyVisual ? styles.cover.legacyThumbItem : styles.cover.officialThumbItem,
           ]"
           @click.prevent.stop="openPhotoSwipe(index)"
         >
           <img
             :src="thumbnail.img"
-            :alt="`${props.variant === 'legacy' ? '预览图' : '视频封面'} ${index + 1}`"
-            :class="[styles.cover.thumbImage, props.variant === 'legacy' && styles.cover.legacyThumbImage]"
+            :alt="`${isLegacyVisual ? '预览图' : '视频封面'} ${index + 1}`"
+            :class="[styles.cover.thumbImage, isLegacyVisual && styles.cover.legacyThumbImage]"
           >
         </a>
       </div>
@@ -78,6 +78,11 @@ const props = withDefaults(defineProps<{
   variant: 'legacy',
 })
 
+/** 新旧页面共用旧版预览条视觉，保留 official 的延迟挂载策略。 */
+const isLegacyVisual = props.variant === 'legacy'
+  || props.variant === 'official'
+  || props.variant === 'official-panel'
+
 /** 旧版文件列表预览帧数量，保持横向 150px 预览的密度。 */
 const FILELIST_VIDEO_COVER_NUM = 8
 
@@ -86,8 +91,8 @@ const styles = clsx({
   // 容器样式
   container: {
     legacyMain: 'h-[150px] w-full [content-visibility:auto]',
-    officialMain: 'h-24 w-full max-w-214 px-4 [content-visibility:auto]',
-    officialPanelMain: 'h-24 w-full max-w-214 px-4 [content-visibility:auto]',
+    officialMain: 'h-[150px] w-full [content-visibility:auto]',
+    officialPanelMain: 'h-[150px] w-full [content-visibility:auto]',
     officialPending: 'h-px overflow-hidden',
     content:
       'bg-base-300 relative flex h-full items-center overflow-hidden rounded',
@@ -155,7 +160,7 @@ function initPhotoSwipe() {
       src: item.img,
       width: item.width,
       height: item.height,
-      alt: props.variant === 'legacy' ? '预览图' : '视频封面',
+      alt: isLegacyVisual ? '预览图' : '视频封面',
     })),
     showHideAnimationType: 'fade',
     pswpModule: PhotoSwipe,

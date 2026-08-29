@@ -1,11 +1,12 @@
 [data-115master-row-addon][data-115master-view='list'],
 [data-115master-row-addon][data-115master-view='virtual-list'] {
+  position: relative;
   display: block;
   width: 100%;
   box-sizing: border-box;
-  padding: 0 32px 8px 72px;
+  padding: 0 0 22px 12px;
   border-bottom: 1px solid #f0f2f5;
-  background: #fff;
+  background: transparent;
 }
 
 [data-115master-row-addon][data-115master-view='list'] [data-115master-native-actions],
@@ -14,11 +15,300 @@
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 10px;
-  min-height: 24px;
+  gap: 0;
+  min-height: 32px;
+  box-sizing: border-box;
+  padding: 0 4px;
+  border: 1px solid #8fb8f5;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
   color: #2777f8;
   font-size: 12px;
   white-space: nowrap;
+}
+
+/* 新版原生悬停条承载 Fusion 入口；不再复制一条独立操作栏。 */
+[data-115master-native-actions][data-115master-merged-actions] {
+  /* 合并模式沿用 115 原生外观，不再额外套 Fusion 外框。 */
+  z-index: 30;
+  gap: 0;
+  width: max-content;
+  max-width: calc(100% - 24px);
+}
+
+/* 115 新版把原生按钮包在一层 React 分组中；分组本身参与同一条 flex 布局。 */
+[data-115master-native-actions][data-115master-merged-actions] [data-115master-native-action-group] {
+  display: contents;
+}
+
+[data-115master-native-actions][data-115master-merged-actions] > a {
+  display: inline-flex;
+  min-height: 30px;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 9px;
+  border-left: 1px solid #dce8fb;
+  color: inherit;
+  font-size: 12px;
+  line-height: 30px;
+  white-space: nowrap;
+}
+
+[data-115master-native-actions][data-115master-merged-actions] > a:first-child {
+  border-left: 0;
+}
+
+[data-115master-native-actions][data-115master-merged-actions] > .master-player {
+  order: 1;
+}
+
+[data-115master-native-actions][data-115master-merged-actions] > [class~='115-player'] {
+  order: 2;
+}
+
+[data-115master-native-actions][data-115master-merged-actions] > .ed2k-link {
+  order: 3;
+}
+
+[data-115master-native-actions][data-115master-merged-actions] > [menu^='download_'] {
+  order: 4;
+}
+
+[data-115master-native-actions][data-115master-merged-actions] > button {
+  order: 10;
+}
+
+[data-115master-native-actions][data-115master-merged-actions] > a:hover,
+[data-115master-native-actions][data-115master-merged-actions] > button:hover {
+  text-decoration: underline;
+}
+
+[data-115master-native-actions][data-115master-merged-actions] > button {
+  display: inline-flex;
+  min-height: 30px;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 9px;
+  border-left: 1px solid #dce8fb;
+  color: inherit;
+  font-size: 12px;
+  line-height: 30px;
+  white-space: nowrap;
+}
+
+/* 可见原生按钮按旧版文件操作条顺序排列；更多菜单继续承载其余入口。 */
+[data-115master-native-actions][data-115master-merged-actions] > button[title='置顶'] {
+  order: 4;
+}
+
+[data-115master-native-actions][data-115master-merged-actions] > button[title='星标'] {
+  order: 5;
+}
+
+[data-115master-native-actions][data-115master-merged-actions] > button[title='下载'] {
+  order: 6;
+}
+
+[data-115master-native-actions][data-115master-merged-actions] > button[title='移动'] {
+  order: 7;
+}
+
+[data-115master-native-actions][data-115master-merged-actions] > button[title='重命名'] {
+  order: 8;
+}
+
+[data-115master-native-actions][data-115master-merged-actions] > button[title='删除'] {
+  order: 9;
+}
+
+[data-115master-native-actions][data-115master-merged-actions] > button[title='分享'] {
+  order: 10;
+}
+
+[data-115master-native-actions][data-115master-merged-actions] > button[title='更多'] {
+  order: 11;
+}
+
+/* 真实新版原生按钮是 data-menu-action 包裹的 button，按旧版顺序重新排布。 */
+[data-115master-native-actions][data-115master-merged-actions] [data-115master-native-action-group] > a {
+  display: inline-flex;
+  min-height: 30px;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 9px;
+  border-left: 1px solid #dce8fb;
+  color: #2777f8;
+  font-size: 12px;
+  line-height: 30px;
+  white-space: nowrap;
+}
+
+[data-115master-native-actions][data-115master-merged-actions] [data-115master-native-action-group] > .master-player {
+  order: 1;
+}
+
+[data-115master-native-actions][data-115master-merged-actions]
+  [data-115master-native-action-group]
+  > [class~='115-player'] {
+  order: 2;
+}
+
+[data-115master-native-actions][data-115master-merged-actions] [data-115master-native-action-group] > .ed2k-link {
+  order: 3;
+}
+
+[data-115master-native-actions][data-115master-merged-actions]
+  [data-115master-native-action-group]
+  > [data-115master-native-menu='置顶'] {
+  order: 4;
+}
+
+[data-115master-native-actions][data-115master-merged-actions]
+  [data-115master-native-action-group]
+  > [data-115master-native-menu='星标'] {
+  order: 5;
+}
+
+[data-115master-native-actions][data-115master-merged-actions]
+  [data-115master-native-action-group]
+  > [data-115master-native-menu='下载'] {
+  order: 6;
+}
+
+[data-115master-native-actions][data-115master-merged-actions]
+  [data-115master-native-action-group]
+  > [data-115master-native-menu='移动'] {
+  order: 7;
+}
+
+[data-115master-native-actions][data-115master-merged-actions]
+  [data-115master-native-action-group]
+  > [data-115master-native-menu='重命名'] {
+  order: 8;
+}
+
+[data-115master-native-actions][data-115master-merged-actions]
+  [data-115master-native-action-group]
+  > [data-115master-native-menu='删除'] {
+  order: 9;
+}
+
+[data-115master-native-actions][data-115master-merged-actions]
+  [data-115master-native-action-group]
+  > [data-115master-native-menu='分享'] {
+  order: 10;
+}
+
+[data-115master-native-actions][data-115master-merged-actions]
+  [data-115master-native-action-group]
+  > [data-115master-native-menu='更多'] {
+  order: 11;
+}
+
+[data-115master-native-actions][data-115master-merged-actions] [data-115master-native-action-group] > a:hover,
+[data-115master-native-actions][data-115master-merged-actions]
+  [data-115master-native-action-group]
+  > [data-115master-native-menu]
+  > button:hover {
+  text-decoration: underline;
+}
+
+/*
+ * ================================================================================
+ * 步骤1：复刻旧版文件操作条
+ * ================================================================================
+ * 目标：新版文件行沿用旧版悬浮操作条的高度、分隔线和按钮顺序。
+ * 数据源：新版附加区中的兼容操作节点。
+ * 操作：
+ * 1) 操作条保留独立行位，避免覆盖原生文件名和文件图标
+ * 2) 用 CSS order 恢复旧版“Master、官方、ED2K、下载”的显示顺序
+ */
+[data-115master-row-addon][data-115master-view='list'] [data-115master-native-actions],
+[data-115master-row-addon][data-115master-view='virtual-list'] [data-115master-native-actions] {
+  position: absolute;
+  top: -36px;
+  left: 12px;
+  z-index: 30;
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+}
+
+/* 没有详情或预览时只保留原生文件行，不为独立操作入口增加空白高度。 */
+[data-115master-row-addon]:not(.with-ext-info):not(.with-ext-video-cover) {
+  padding-bottom: 0;
+}
+
+[data-115master-row-addon] [data-115master-native-actions] a {
+  display: inline-flex;
+  min-height: 30px;
+  box-sizing: border-box;
+  align-items: center;
+  padding: 0 9px;
+  border-left: 1px solid #dce8fb;
+  line-height: 30px;
+}
+
+[data-115master-row-addon] [data-115master-native-actions] a:first-child {
+  border-left: 0;
+}
+
+[data-115master-row-addon] [data-115master-native-actions] .master-player {
+  order: 1;
+}
+
+[data-115master-row-addon] [data-115master-native-actions] [class~='115-player'] {
+  order: 2;
+}
+
+[data-115master-row-addon] [data-115master-native-actions] .ed2k-link {
+  order: 3;
+}
+
+[data-115master-row-addon] [data-115master-native-actions] a[menu^='download_'] {
+  order: 4;
+}
+
+/* 网格详情面板的操作条仍在面板文档流中，避免被面板顶部裁掉。 */
+[data-115master-grid-panel] [data-115master-native-actions] {
+  position: relative;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  margin: 0 12px 8px;
+  overflow: auto;
+}
+
+[data-115master-grid-panel] [data-115master-native-actions] a {
+  display: inline-flex;
+  min-height: 30px;
+  box-sizing: border-box;
+  align-items: center;
+  padding: 0 9px;
+  border-left: 1px solid #dce8fb;
+  line-height: 30px;
+}
+
+[data-115master-grid-panel] [data-115master-native-actions] a:first-child {
+  border-left: 0;
+}
+
+[data-115master-grid-panel] [data-115master-native-actions] .master-player {
+  order: 1;
+}
+
+[data-115master-grid-panel] [data-115master-native-actions] [class~='115-player'] {
+  order: 2;
+}
+
+[data-115master-grid-panel] [data-115master-native-actions] .ed2k-link {
+  order: 3;
+}
+
+[data-115master-grid-panel] [data-115master-native-actions] a[menu^='download_'] {
+  order: 4;
 }
 
 [data-115master-row-addon] [data-115master-native-actions] a,
@@ -75,10 +365,16 @@
   min-height: 50px;
   max-height: 50px;
   flex: 0 0 50px;
-  border: 2px solid #e6eaf0;
+  margin-right: 12px;
+  border: 3px solid #f1f1f1;
   border-radius: 50%;
   object-fit: cover;
   background: #f3f5f8;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+}
+
+[data-115master-grid-panel-header][data-115master-actress-host] {
+  justify-content: flex-start;
 }
 
 /*
@@ -142,18 +438,18 @@
 
 [data-115master-grid-panel] {
   position: fixed;
-  top: 72px;
+  top: 96px;
   right: 24px;
   bottom: 24px;
   z-index: 2147483645;
   display: flex;
-  width: min(760px, calc(100vw - 48px));
+  width: min(1200px, calc(100vw - 48px));
   box-sizing: border-box;
   flex-direction: column;
   overflow: hidden;
   border: 1px solid #dce2ea;
-  border-radius: 6px;
-  background: #fff;
+  border-radius: 12px;
+  background: #f8f8fa;
   box-shadow: 0 18px 48px rgba(15, 23, 42, 0.24);
   color: #27364a;
 }
@@ -164,13 +460,14 @@
 
 [data-115master-grid-panel-header] {
   display: flex;
-  min-height: 44px;
+  min-height: 48px;
   box-sizing: border-box;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 6px 10px 6px 16px;
+  padding: 6px 10px 6px 20px;
   border-bottom: 1px solid #edf0f4;
+  background: #f8f8fa;
 }
 
 [data-115master-grid-panel-header] strong {
@@ -200,14 +497,15 @@
   min-height: 0;
   flex: 1;
   overflow: auto;
-  padding: 8px 12px 16px;
+  padding: 8px 0 16px;
+  background: #f8f8fa;
 }
 
 @media (max-width: 900px) {
   [data-115master-row-addon][data-115master-view='list'],
   [data-115master-row-addon][data-115master-view='virtual-list'] {
-    padding-right: 16px;
-    padding-left: 48px;
+    padding-right: 0;
+    padding-left: 8px;
   }
 
   [data-115master-row-addon] [data-115master-native-actions] {

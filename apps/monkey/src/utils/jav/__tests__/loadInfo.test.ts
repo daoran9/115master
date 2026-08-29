@@ -135,12 +135,12 @@ describe('loadJavInfo', () => {
     testLogger.info('JavLibrary 详情补全缓存验证完成')
   })
 
-  it('已显示的后备来源缓存不重复联网', async () => {
+  it('后备来源缓存立即显示并后台升级首选来源', async () => {
     /*
      * ================================================================================
      * 步骤1：验证后备来源热缓存
      * ================================================================================
-     * 目标：上次采用 JavBus 后，刷新页面直接恢复已显示详情。
+     * 目标：上次采用 JavBus 后，刷新页面先恢复已显示详情，再后台升级 JavLibrary。
      * 数据源：JavLibrary 空缓存和可展示的 JavBus 缓存。
      * 操作：
      * 1) 并行读取全部来源缓存
@@ -154,12 +154,19 @@ describe('loadJavInfo', () => {
       source(JAV_SOURCE.MISSAV),
     ]
 
-    const result = await loadJavInfo('FIRST-001', sources)
+    const upgrades: JavInfo[] = []
+    const result = await loadJavInfo('FIRST-001', sources, {
+      onUpgrade: upgrade => upgrades.push(upgrade),
+    })
 
     expect(result?.source).toBe(JAV_SOURCE.JAVBUS)
-    expect(sources.every(item => item.getInfo.mock.calls.length === 0)).toBe(true)
-    expect(cache.set).toHaveBeenCalledWith('Fusion:FIRST-001', result)
-    testLogger.info('后备来源热缓存验证完成')
+    await vi.waitFor(() => expect(sources[0]!.getInfo).toHaveBeenCalledOnce())
+    await vi.waitFor(() => expect(upgrades[0]?.source).toBe(JAV_SOURCE.JAVLIBRARY))
+    expect(sources.slice(1).every(item => item.getInfo.mock.calls.length === 0)).toBe(true)
+    expect(cache.set).toHaveBeenCalledWith('Fusion:FIRST-001', expect.objectContaining({
+      source: JAV_SOURCE.JAVLIBRARY,
+    }))
+    testLogger.info('后备来源缓存后台升级完成')
   })
 
   it('完整融合缓存不因主来源暂时不可用而重复联网', async () => {
@@ -176,6 +183,7 @@ describe('loadJavInfo', () => {
     testLogger.info('开始验证完整融合缓存即时命中')
     cache.get.mockResolvedValueOnce({
       value: info(JAV_SOURCE.JAVBUS, 'MERGED-FAST-001'),
+      updatedAt: Date.now(),
     })
     const sources = [
       source(JAV_SOURCE.JAVLIBRARY),
@@ -189,6 +197,90 @@ describe('loadJavInfo', () => {
     expect(result?.source).toBe(JAV_SOURCE.JAVBUS)
     expect(sources.every(item => item.getInfo.mock.calls.length === 0)).toBe(true)
     testLogger.info('完整融合缓存即时命中验证完成')
+  })
+
+  it('低优先级融合缓存到期后只后台升级 JavLibrary', async () => {
+    /*
+     * ================================================================================
+     * 步骤1：验证融合缓存后台升级
+     * ================================================================================
+     * 目标：后备详情先显示，首选来源恢复后异步替换，不重新请求其他来源。
+     * 数据源：过期 JavBus 融合缓存和延迟完成的 JavLibrary 请求。
+     * 操作：
+     * 1) 返回过期后备缓存并启动首选来源升级
+     * 2) 完成 JavLibrary 请求后核对回调和融合缓存
+     */
+    testLogger.info('开始验证融合缓存后台升级')
+    cache.get.mockResolvedValueOnce({
+      value: info(JAV_SOURCE.JAVBUS, 'UPGRADE-001'),
+      updatedAt: Date.now() - 11 * 60 * 1000,
+    })
+    const javLibraryResult = deferred<JavInfo | undefined>()
+    const sources = [
+      source(JAV_SOURCE.JAVLIBRARY, undefined, javLibraryResult.promise),
+      source(JAV_SOURCE.JAVBUS),
+      source(JAV_SOURCE.JAVDB),
+      source(JAV_SOURCE.MISSAV),
+    ]
+    const upgrades: JavInfo[] = []
+
+    const result = await loadJavInfo('UPGRADE-001', sources, {
+      onUpgrade: upgrade => upgrades.push(upgrade),
+    })
+
+    expect(result?.source).toBe(JAV_SOURCE.JAVBUS)
+    expect(sources[0]!.getInfo).toHaveBeenCalledOnce()
+    expect(sources.slice(1).every(item => item.getInfo.mock.calls.length === 0)).toBe(true)
+
+    javLibraryResult.resolve(info(JAV_SOURCE.JAVLIBRARY, 'UPGRADE-001'))
+    await vi.waitFor(() => expect(upgrades[0]?.source).toBe(JAV_SOURCE.JAVLIBRARY))
+    expect(cache.set).toHaveBeenCalledWith('Fusion:UPGRADE-001', expect.objectContaining({
+      source: JAV_SOURCE.JAVLIBRARY,
+    }))
+    testLogger.info('融合缓存后台升级验证完成')
+  })
+
+  it('首选来源失败后进入冷却窗口，不重复撞击 Cloudflare', async () => {
+    /*
+     * ================================================================================
+     * 步骤1：验证首选来源失败冷却
+     * ================================================================================
+     * 目标：JavLibrary 暂时被 Cloudflare 拦截时，短时间刷新不重复创建请求。
+     * 数据源：过期后备融合缓存和失败的 JavLibrary 请求。
+     * 操作：
+     * 1) 失败后刷新 Fusion 后备缓存时间
+     * 2) 第二次加载命中冷却缓存并保持首选来源零请求
+     */
+    testLogger.info('开始验证首选来源失败冷却')
+    const fallback = info(JAV_SOURCE.JAVDB, 'COOLDOWN-001')
+    cache.get.mockResolvedValueOnce({
+      value: fallback,
+      updatedAt: Date.now() - 11 * 60 * 1000,
+    })
+    const javLibrary = source(JAV_SOURCE.JAVLIBRARY, undefined, undefined)
+    const sources = [
+      javLibrary,
+      source(JAV_SOURCE.JAVDB),
+    ]
+
+    await expect(loadJavInfo('COOLDOWN-001', sources)).resolves.toMatchObject({
+      source: JAV_SOURCE.JAVDB,
+    })
+    await vi.waitFor(() => expect(javLibrary.getInfo).toHaveBeenCalledOnce())
+    expect(cache.set).toHaveBeenCalledWith('Fusion:COOLDOWN-001', expect.objectContaining({
+      source: JAV_SOURCE.JAVDB,
+      avNumber: 'COOLDOWN-001',
+    }))
+
+    cache.get.mockResolvedValueOnce({
+      value: fallback,
+      updatedAt: Date.now(),
+    })
+    await expect(loadJavInfo('COOLDOWN-001', sources)).resolves.toMatchObject({
+      source: JAV_SOURCE.JAVDB,
+    })
+    expect(javLibrary.getInfo).toHaveBeenCalledOnce()
+    testLogger.info('首选来源失败冷却验证完成')
   })
 
   it('缺少演员和导演的可展示详情仍作为融合缓存复用', async () => {
@@ -213,6 +305,7 @@ describe('loadJavInfo', () => {
         studio: undefined,
         series: undefined,
       }),
+      updatedAt: Date.now(),
     })
     const sources = [
       source(JAV_SOURCE.JAVLIBRARY),
@@ -447,6 +540,52 @@ describe('loadJavInfo', () => {
 
     await expect(Promise.all(loads)).resolves.toHaveLength(4)
     testLogger.info('番号资料联网并发限制验证完成')
+  })
+
+  it('后备缓存后台升级复用同一联网并发上限', async () => {
+    /*
+     * ================================================================================
+     * 步骤1：验证后台升级联网并发限制
+     * ================================================================================
+     * 目标：大量后备缓存同时过期时，不让后台 JavLibrary 请求绕过页面级并发上限。
+     * 数据源：四个过期的 Fusion 后备缓存和四个受控的 JavLibrary 响应。
+     * 操作：
+     * 1) 同时启动四个后台升级任务
+     * 2) 核对前三个先占用网络槽，释放后第四个才开始
+     */
+    testLogger.info('开始验证后台升级联网并发限制')
+
+    const networkResults = Array.from(
+      { length: 4 },
+      () => deferred<JavInfo | undefined>(),
+    )
+    let callIndex = 0
+    const primary = {
+      source: JAV_SOURCE.JAVLIBRARY,
+      getInfoByCache: vi.fn(async () => undefined),
+      getInfo: vi.fn(() => networkResults[callIndex++]!.promise),
+    }
+    cache.get.mockImplementation(async (key: string) => {
+      const avNumber = key.replace('Fusion:', '')
+      return {
+        value: info(JAV_SOURCE.JAVBUS, avNumber),
+        updatedAt: Date.now() - 11 * 60 * 1000,
+      }
+    })
+
+    const loads = Array.from({ length: 4 }, (_, index) => loadJavInfo(`BACKGROUND-QUEUE-${index + 1}`, [primary]))
+    await vi.waitFor(() => expect(primary.getInfo).toHaveBeenCalledTimes(3))
+    expect(callIndex).toBe(3)
+
+    networkResults[0]!.resolve(info(JAV_SOURCE.JAVLIBRARY, 'BACKGROUND-QUEUE-1'))
+    await vi.waitFor(() => expect(primary.getInfo).toHaveBeenCalledTimes(4))
+    networkResults.slice(1).forEach((result, index) => {
+      result.resolve(info(JAV_SOURCE.JAVLIBRARY, `BACKGROUND-QUEUE-${index + 2}`))
+    })
+    await Promise.all(loads)
+    await vi.waitFor(() => expect(cache.set).toHaveBeenCalledTimes(8))
+
+    testLogger.info('后台升级联网并发限制验证完成')
   })
 
   it('全部来源缓慢时分段启动所有后备请求', async () => {

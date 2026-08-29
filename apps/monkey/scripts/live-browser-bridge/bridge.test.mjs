@@ -124,7 +124,7 @@ test('serves public update metadata without exposing controller commands', async
     )
     const metadata = await metadataResponse.text()
     assert.equal(metadataResponse.status, 200)
-    assert.match(metadata, /@version\s+0\.2\.15/)
+    assert.match(metadata, /@version\s+0\.2\.16/)
     assert.match(metadata, /@updateURL\s+http:\/\/127\.0\.0\.1:11531/)
     assert.doesNotMatch(metadata, /\(function \(\)/)
 
@@ -351,7 +351,7 @@ test('reads Fusion state inside a visible same-origin iframe', () => {
       1,
     )
     assert.equal(api.findTextCandidates('Master 播放', true).length, 1)
-    assert.equal(status.bridgeVersion, '0.2.15')
+    assert.equal(status.bridgeVersion, '0.2.16')
     assert.equal(status.pageFeatures.accessibleDocumentCount, 2)
     assert.equal(status.native.legacyRowCount, 1)
     assert.equal(status.native.visibleLegacyRowCount, 1)
@@ -382,6 +382,10 @@ test('reads Fusion state inside a visible same-origin iframe', () => {
     assert.equal(
       api.validateImageUrl('https://awsimgsrc.dmm.co.jp/pics_dig/test.jpg').hostname,
       'awsimgsrc.dmm.co.jp',
+    )
+    assert.equal(
+      api.validateImageUrl('https://c0.jdbstatic.com/covers/kk/example.jpg').hostname,
+      'c0.jdbstatic.com',
     )
     assert.throws(
       () => api.validateImageUrl('http://awsimgsrc.dmm.co.jp/pics_dig/test.jpg'),

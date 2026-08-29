@@ -10,6 +10,8 @@ import { goToPlayer } from '@/utils/route'
 import { webLinkIINA } from '@/utils/weblink'
 import { FileItemModBase } from './base'
 
+const NATIVE_ACTION_GROUP_SELECTOR = '[data-115master-native-action-group]'
+
 /**
  * 按钮配置
  */
@@ -40,7 +42,7 @@ export class FileItemModExtMenu extends FileItemModBase {
       {
         class: '115-player',
         title: '使用【115官方播放器】',
-        text: this.itemInfo.surface === 'legacy' ? '5️⃣ 官方播放' : '官方播放',
+        text: this.useLegacyLabels ? '5️⃣ 官方播放' : '官方播放',
         visible: this.itemInfo.attributes.iv === IvType.Yes,
         click: () => {
           GM_openInTab(
@@ -57,8 +59,8 @@ export class FileItemModExtMenu extends FileItemModBase {
             {
               class: 'iina-player',
               title: '使用【iina】',
-              text: this.itemInfo.surface === 'legacy' ? '🎵 iina 播放' : 'IINA',
-              icon: this.itemInfo.surface === 'legacy' ? undefined : iinaIcon,
+              text: this.useLegacyLabels ? '🎵 iina 播放' : 'IINA',
+              icon: this.useLegacyLabels ? undefined : iinaIcon,
               visible: this.itemInfo.attributes.iv === IvType.Yes,
               click: async () => {
                 try {
@@ -77,7 +79,7 @@ export class FileItemModExtMenu extends FileItemModBase {
       {
         class: 'master-player',
         title: '使用【Master播放器】',
-        text: this.itemInfo.surface === 'legacy' ? '▶️ Master 播放' : 'Master 播放',
+        text: this.useLegacyLabels ? '▶️ Master 播放' : 'Master 播放',
         visible: this.itemInfo.attributes.iv === IvType.Yes,
         click: () => {
           goToPlayer(
@@ -124,10 +126,20 @@ export class FileItemModExtMenu extends FileItemModBase {
 
   /** 文件操作节点 */
   get fileOprNode() {
-    return (
-      this.itemNode.querySelector('.file-opr')
+    const interactionRoot = this.itemInfo.surface === 'official'
+      ? this.itemInfo.interactionNode ?? this.itemNode
+      : this.itemNode
+    const mergedActions = interactionRoot.querySelector<HTMLElement>('[data-115master-merged-actions]')
+    return mergedActions?.querySelector<HTMLElement>(NATIVE_ACTION_GROUP_SELECTOR)
+      ?? mergedActions
+      ?? this.itemNode.querySelector('.file-opr')
       ?? this.itemNode.querySelector('.file-opt')
-    )
+  }
+
+  /** 新旧页面统一沿用旧版文件操作入口的文字标记。 */
+  private get useLegacyLabels(): boolean {
+    return this.itemInfo.surface === 'legacy'
+      || this.itemInfo.surface === 'official'
   }
 
   /** 加载 */

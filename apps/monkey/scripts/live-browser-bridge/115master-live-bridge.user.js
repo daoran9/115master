@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         115Master Local Test Bridge
 // @namespace    https://github.com/daoran9/115master/testing
-// @version      0.2.15
+// @version      0.2.16
 // @description  Connects a normally started 115Browser tab to the local acceptance controller.
 // @downloadURL  http://127.0.0.1:11531/updates/bridge.user.js
 // @updateURL    http://127.0.0.1:11531/updates/bridge.meta.js
@@ -16,6 +16,8 @@
 // @connect      127.0.0.1
 // @connect      javbus.com
 // @connect      javdb.com
+// @connect      jdbstatic.com
+// @connect      *.jdbstatic.com
 // @connect      javlibrary.com
 // @connect      missav.ws
 // @connect      fourhoi.com
@@ -39,7 +41,7 @@
 (function () {
   'use strict'
 
-  const BRIDGE_VERSION = '0.2.15'
+  const BRIDGE_VERSION = '0.2.16'
   const CONFIG_KEY = '115master-live-bridge-config'
   const CLIENT_ID_KEY = '115master-live-bridge-client-id'
   const FUSION_CACHE_DATABASE = '115master_cache'
@@ -75,10 +77,13 @@
     'content.mfcdn.jp',
     'pics.dmm.co.jp',
     'awsimgsrc.dmm.co.jp',
+    'jdbstatic.com',
+    'c0.jdbstatic.com',
   ])
   const IMAGE_HOST_SUFFIXES = [
     '.contents.fc2.com',
     '.mfcdn.jp',
+    '.jdbstatic.com',
   ]
   const logger = {
     info: (...messages) => console.info('[115Master Test Bridge]', ...messages),

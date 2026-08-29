@@ -83,6 +83,36 @@ describe('officialFileDataStore', () => {
     testLogger.info('新版文件重命名索引验证完成')
   })
 
+  it('限制新版文件索引容量并保留新写入项', () => {
+    /*
+     * ================================================================================
+     * 步骤1：验证新版文件索引容量
+     * ================================================================================
+     * 目标：用户连续浏览大量目录时，文件对象索引不会无限增长。
+     * 数据源：容量为两个文件项的独立索引实例。
+     * 操作：
+     * 1) 写入两个旧文件
+     * 2) 写入第三个文件，核对最早写入项被淘汰
+     */
+    testLogger.info('开始验证新版文件索引容量')
+
+    const store = new OfficialFileDataStore(2)
+    store.ingest({
+      data: [
+        { n: 'old-1.mp4', fid: 'old-1', pid: '0' },
+        { n: 'old-2.mp4', fid: 'old-2', pid: '0' },
+      ],
+    })
+    store.ingest({ data: [{ n: 'new.mp4', fid: 'new', pid: '0' }] })
+
+    expect(store.size).toBe(2)
+    expect(store.findByName('old-1.mp4', '0')).toBeNull()
+    expect(store.findByName('old-2.mp4', '0')?.fid).toBe('old-2')
+    expect(store.findByName('new.mp4', '0')?.fid).toBe('new')
+
+    testLogger.info('新版文件索引容量验证完成')
+  })
+
   it('只按当前目录并保持接口顺序列出文件', () => {
     /*
      * ================================================================================

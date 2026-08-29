@@ -1,6 +1,6 @@
 # 播放器详情图片现场复核
 
-Status: ready-for-human
+Status: resolved
 
 ## 现象
 
@@ -28,3 +28,9 @@ Status: ready-for-human
 ## 证据
 
 - 原始截图：`D:\Temp\codex-clipboard-672a4395-acc5-4cb4-9c51-14373e601ef4.png`
+
+## Answer
+
+- 真实播放器普通模式和剧院模式均已检查，演员头像和八张剧照正常显示。
+- 剧院模式点击剧照复用已加载 Blob 打开 PhotoSwipe，不再出现“未连接”。
+- 用户确认预览正常；完整业务 E2E、播放器图片链和剧院模式滚动回归通过。

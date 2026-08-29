@@ -543,17 +543,15 @@ class OfficialPage {
      * 步骤1：定位新版工具栏按钮
      * ================================================================================
      * 目标：只把 Fusion 挂到横向工具栏，不误挂到纵向侧栏里的“新建”。
-     * 数据源：当前页面及同源 iframe 内的可见按钮节点。
+     * 数据源：新版顶层文档中的可见按钮节点。
      * 操作：
      * 1) 匹配“新建”及其带前缀、下拉箭头变体
      * 2) 排除高而窄的纵向导航容器
      */
     this.logger.info('开始定位新版页面新建按钮')
 
-    const candidates = this.getAccessibleDocuments().flatMap(current => Array.from(
-      current.querySelectorAll<HTMLElement>(
-        'button, a, [role="button"], [class*="cursor-pointer"]',
-      ),
+    const candidates = Array.from(document.querySelectorAll<HTMLElement>(
+      'button, a, [role="button"], [class*="cursor-pointer"]',
     ))
     const anchor = candidates.find((node) => {
       const label = node.textContent?.replace(/\s+/g, '').trim()
@@ -656,33 +654,15 @@ class OfficialPage {
      * ================================================================================
      * 步骤1：选择当前页面工具栏挂载点
      * ================================================================================
-     * 目标：旧版保留原版入口，新版才挂载 Fusion 工具组。
-     * 数据源：旧版预览开关、旧版顶栏入口和新版“新建”按钮。
+     * 目标：新版顶层工具栏优先，旧版页面保留原版入口。
+     * 数据源：新版顶层“新建”按钮、旧版预览开关和旧版顶栏入口。
      * 操作：
-     * 1) 发现旧版入口时卸载 Fusion 宿主
-     * 2) 其他页面再解析新版工具项
+     * 1) 先确认顶层新版工具栏，避免被嵌套旧版 iframe 误判
+     * 2) 新版工具栏不存在时再保留旧版入口并卸载 Fusion 宿主
      */
     this.logger.info('开始选择当前页面工具栏挂载点')
 
-    /** 1.1 旧版 iframe 是用户可见主界面，由旧版入口和原版预览控件负责。 */
-    const legacyPreview = this.findLegacyPreviewAnchor()
-    const legacyToolbar = legacyPreview ? null : this.findLegacyToolbarAnchor()
-    if (legacyPreview || legacyToolbar) {
-      if (this.toolbarRetryId !== null)
-        window.clearTimeout(this.toolbarRetryId)
-      this.toolbarRetryId = null
-      this.toolbarRetryAttempts = 0
-      this.toolbarMount = null
-      this.host.remove()
-      this.host.setAttribute('data-placement', 'legacy-hidden')
-      this.logger.info(
-        '检测到旧版页面，保留原版入口并卸载 Fusion 工具组',
-        legacyPreview ? 'legacy-preview' : 'legacy-toolbar',
-      )
-      return
-    }
-
-    /** 1.2 没有旧版标记时，才解析新版横向工具栏。 */
+    /** 1.1 先解析顶层新版横向工具栏，隔离嵌套旧版 iframe 的节点。 */
     const toolbarAnchor = this.findToolbarAnchor()
     const mount = (toolbarAnchor ? this.findToolbarMount(toolbarAnchor) : null)
       ?? (this.toolbarMount?.isConnected ? this.toolbarMount : null)
@@ -704,6 +684,24 @@ class OfficialPage {
       this.logger.info(
         '当前页面工具栏挂载点选择完成',
         'toolbar',
+      )
+      return
+    }
+
+    /** 1.2 顶层没有新版工具栏时，由旧版入口和原版预览控件负责。 */
+    const legacyPreview = this.findLegacyPreviewAnchor()
+    const legacyToolbar = legacyPreview ? null : this.findLegacyToolbarAnchor()
+    if (legacyPreview || legacyToolbar) {
+      if (this.toolbarRetryId !== null)
+        window.clearTimeout(this.toolbarRetryId)
+      this.toolbarRetryId = null
+      this.toolbarRetryAttempts = 0
+      this.toolbarMount = null
+      this.host.remove()
+      this.host.setAttribute('data-placement', 'legacy-hidden')
+      this.logger.info(
+        '检测到旧版页面，保留原版入口并卸载 Fusion 工具组',
+        legacyPreview ? 'legacy-preview' : 'legacy-toolbar',
       )
       return
     }

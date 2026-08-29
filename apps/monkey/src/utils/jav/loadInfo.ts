@@ -12,8 +12,10 @@ const logger = appLogger.sub('JavInfoLoader')
 const DEFAULT_HEDGE_DELAY = 1200
 const DEFAULT_SOURCE_WAIT_TIMEOUTS = [5000, 4000, 4000, 4000]
 const MAX_CONCURRENT_NETWORK_LOADS = 3
+const FALLBACK_UPGRADE_COOLDOWN_MS = 10 * 60 * 1000
 const MERGED_CACHE_PREFIX = 'Fusion'
 const inFlightLoads = new Map<string, Promise<JavInfo | null>>()
+const backgroundUpgrades = new Map<string, Promise<JavInfo | null>>()
 const networkLoadWaiters: Array<(release: () => void) => void> = []
 let activeNetworkLoads = 0
 
@@ -24,9 +26,10 @@ export interface JavInfoSource {
   cancelInfoRequest?: (avNumber: string) => void
 }
 
-interface LoadJavInfoOptions {
+export interface LoadJavInfoOptions {
   hedgeDelay?: number
   sourceWaitTimeout?: number
+  onUpgrade?: (info: JavInfo) => void
 }
 
 interface SourceResult {
@@ -156,6 +159,76 @@ async function cacheMergedInfo(avNumber: string, info: JavInfo | null) {
   await javCache.set(`${MERGED_CACHE_PREFIX}:${avNumber}`, info)
 }
 
+/** 判断低优先级融合缓存是否到了重新探测首选来源的时间。 */
+function shouldUpgradeFallback(
+  entry: { updatedAt?: number } | null,
+): boolean {
+  if (!entry?.updatedAt)
+    return true
+  return Date.now() - entry.updatedAt >= FALLBACK_UPGRADE_COOLDOWN_MS
+}
+
+/** 低优先级缓存命中后只后台探测首选来源，避免重新启动整条来源链。 */
+function startBackgroundUpgrade(
+  avNumber: string,
+  sources: JavInfoSource[],
+  cachedInfos: Array<JavInfo | undefined>,
+  fallback: JavInfo,
+): Promise<JavInfo | null> {
+  const lookupKey = normalizeAvNumber(avNumber)
+  const activeUpgrade = backgroundUpgrades.get(lookupKey)
+  if (activeUpgrade)
+    return activeUpgrade
+
+  const primary = sources[0]
+  if (!primary)
+    return Promise.resolve(fallback)
+
+  /*
+   * ================================================================================
+   * 步骤2.1：后台升级首选资料源
+   * ================================================================================
+   * 目标：先显示已有后备缓存，再用 JavLibrary 等首选来源异步纠正结果。
+   * 数据源：当前番号的来源缓存、Fusion 融合缓存和首选来源网络请求。
+   * 操作：
+   * 1) 同一番号只允许一个后台升级任务
+   * 2) 首选来源成功后覆盖 Fusion 缓存
+   * 3) 调用方先刷新后备缓存时间，失败任务不再重复写入资料
+   */
+  logger.info('开始后台升级番号首选来源', avNumber, primary.source)
+  const task = (async () => {
+    const releaseNetworkLoad = await acquireNetworkLoadSlot()
+    try {
+      const result = await requestSource(primary, avNumber)
+      if (result.info) {
+        const mergedInfo = mergeJavInfo(avNumber, [
+          result.info,
+          ...cachedInfos,
+          fallback,
+        ])
+        if (isJavInfoDisplayable(avNumber, mergedInfo)) {
+          await cacheMergedInfo(avNumber, mergedInfo)
+          logger.info('番号首选来源后台升级完成', avNumber, mergedInfo.source)
+          return mergedInfo
+        }
+      }
+
+      logger.info('番号首选来源后台升级结束，继续使用后备缓存', avNumber, fallback.source)
+      return null
+    }
+    finally {
+      releaseNetworkLoad()
+      logger.info('番号首选来源后台升级网络槽释放完成', avNumber)
+    }
+  })().finally(() => {
+    if (backgroundUpgrades.get(lookupKey) === task)
+      backgroundUpgrades.delete(lookupKey)
+    logger.info('番号首选来源后台升级任务释放完成', avNumber)
+  })
+  backgroundUpgrades.set(lookupKey, task)
+  return task
+}
+
 /** 请求单个资料源，并把可回退错误转换为空结果。 */
 async function requestSource(source: JavInfoSource, avNumber: string): Promise<SourceResult> {
   try {
@@ -272,6 +345,7 @@ export function loadJavInfo(
     sources,
     options.hedgeDelay ?? DEFAULT_HEDGE_DELAY,
     options.sourceWaitTimeout,
+    options.onUpgrade,
   ).finally(() => {
     if (inFlightLoads.get(lookupKey) === task)
       inFlightLoads.delete(lookupKey)
@@ -286,10 +360,51 @@ async function loadJavInfoInternal(
   sources: JavInfoSource[],
   hedgeDelay: number,
   sourceWaitTimeout?: number,
+  onUpgrade?: (info: JavInfo) => void,
 ): Promise<JavInfo | null> {
   const mergedCache = await javCache.get(`${MERGED_CACHE_PREFIX}:${avNumber}`)
   const mergedInfo = mergedCache?.value ?? null
+
+  /**
+   * ================================================================================
+   * 步骤1：优先复用融合缓存
+   * ================================================================================
+   * 目标：完整主来源缓存不重复读取四个来源；后备缓存只探测首选来源。
+   * 数据源：Fusion 融合缓存和来源数组中的第一优先级客户端。
+   * 操作：
+   * 1) Fusion 已由 JavLibrary 生成时直接返回
+   * 2) Fusion 为后备来源时只读取 JavLibrary 缓存
+   * 3) 后备缓存到期后启动单个后台升级任务
+   */
+  const primary = sources[0]
   if (isJavInfoDisplayable(avNumber, mergedInfo)) {
+    if (!primary || mergedInfo.source === primary.source)
+      return mergedInfo
+
+    const primaryCache = await primary.getInfoByCache(avNumber)
+    if (primaryCache) {
+      const upgradedInfo = mergeJavInfo(avNumber, [primaryCache, mergedInfo])
+      if (isJavInfoDisplayable(avNumber, upgradedInfo)) {
+        await cacheMergedInfo(avNumber, upgradedInfo)
+        return upgradedInfo
+      }
+    }
+
+    if (shouldUpgradeFallback(mergedCache)) {
+      await cacheMergedInfo(avNumber, mergedInfo)
+      const upgrade = startBackgroundUpgrade(
+        avNumber,
+        sources,
+        [primaryCache],
+        mergedInfo,
+      )
+      if (onUpgrade) {
+        void upgrade.then((info) => {
+          if (info)
+            onUpgrade(info)
+        })
+      }
+    }
     return mergedInfo
   }
 
@@ -318,10 +433,25 @@ async function loadJavInfoInternal(
     )
     return undefined
   })
-  const cachedInfo = mergeJavInfo(avNumber, cachedInfos)
+  const cachedInfo = mergeJavInfo(avNumber, [...cachedInfos, mergedInfo])
   logger.info('番号资料缓存读取完成', avNumber)
   if (isJavInfoDisplayable(avNumber, cachedInfo)) {
-    await cacheMergedInfo(avNumber, cachedInfo)
+    const primarySource = sources[0]?.source
+    const hasPrimaryCache = cachedInfos.some(info => info?.source === primarySource)
+    const needsPrimaryUpgrade = !hasPrimaryCache
+      && shouldUpgradeFallback(mergedCache)
+    if (!mergedCache || hasPrimaryCache || needsPrimaryUpgrade)
+      await cacheMergedInfo(avNumber, cachedInfo)
+
+    if (needsPrimaryUpgrade) {
+      const upgrade = startBackgroundUpgrade(avNumber, sources, cachedInfos, cachedInfo)
+      if (onUpgrade) {
+        void upgrade.then((info) => {
+          if (info)
+            onUpgrade(info)
+        })
+      }
+    }
     return cachedInfo
   }
 
@@ -332,7 +462,7 @@ async function loadJavInfoInternal(
    * 目标：冷缓存首屏不同时启动几十条跨站请求，避免来源响应整体超时。
    * 数据源：当前页面共享的番号联网任务队列。
    * 操作：
-   * 1) 最多允许两个番号同时联网
+     * 1) 最多允许三个番号同时联网
    * 2) 当前番号完成后把槽位交给下一项
    */
   logger.info('开始等待番号资料网络加载槽', avNumber)

@@ -28,6 +28,7 @@ type FileDataListener = () => void
 
 const logger = appLogger.sub('OfficialFileData')
 const FETCH_CAPTURE_MARKER = '__115masterOfficialFileCapture__'
+const DEFAULT_MAX_ITEMS = 2048
 
 /** 判断未知值是否是新版文件列表项。 */
 export function isOfficialFileItem(value: unknown): value is OfficialFileItem {
@@ -56,6 +57,12 @@ export class OfficialFileDataStore {
   private readonly items = new Map<string, OfficialFileItem>()
   private readonly itemsByName = new Map<string, OfficialFileItem[]>()
   private readonly listeners = new Set<FileDataListener>()
+
+  constructor(private readonly maxItems = DEFAULT_MAX_ITEMS) {}
+
+  get size(): number {
+    return this.items.size
+  }
 
   /** 清空数据，供页面销毁或测试隔离使用。 */
   clear(): void {
@@ -86,11 +93,12 @@ export class OfficialFileDataStore {
       })
     }
 
+    const evicted = this.trim()
     this.rebuildNameIndex()
     if (data.length > 0)
       this.listeners.forEach(listener => listener())
 
-    logger.info('新版文件数据索引完成', source, data.length)
+    logger.info('新版文件数据索引完成', source, data.length, evicted)
     return data.length
   }
 
@@ -139,6 +147,19 @@ export class OfficialFileDataStore {
       return []
 
     return response.data.filter(isOfficialFileItem)
+  }
+
+  /** 限制当前页面文件索引的内存占用，优先淘汰最早写入项。 */
+  private trim(): number {
+    let evicted = 0
+    while (this.items.size > this.maxItems) {
+      const oldest = this.items.keys().next().value
+      if (oldest === undefined)
+        break
+      this.items.delete(oldest)
+      evicted += 1
+    }
+    return evicted
   }
 
   /** 重建文件名索引，确保重命名后不会保留旧文件名。 */

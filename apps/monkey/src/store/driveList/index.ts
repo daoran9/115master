@@ -19,6 +19,7 @@ export const pageCache = new PageCache()
 
 /** 滚动位置（per area:cid，不含页码），仅 drive 页使用 */
 const scrollPositions = new Map<string, number>()
+const MAX_SCROLL_POSITIONS = 128
 
 type ListData = Api.FileApi.Res.Files
 
@@ -91,8 +92,20 @@ export const useDriveStore = defineStore('drive', () => {
     return `${nav.area.value || 'all'}:${nav.cid.value || '0'}`
   }
 
+  /** 限制会话内滚动记录，避免连续浏览目录时只增长不回收。 */
+  function rememberScroll(key: string, top: number) {
+    scrollPositions.delete(key)
+    scrollPositions.set(key, top)
+    while (scrollPositions.size > MAX_SCROLL_POSITIONS) {
+      const oldest = scrollPositions.keys().next().value
+      if (oldest === undefined)
+        return
+      scrollPositions.delete(oldest)
+    }
+  }
+
   function saveScroll() {
-    scrollPositions.set(scrollKey(), window.scrollY)
+    rememberScroll(scrollKey(), window.scrollY)
   }
 
   function restoreScroll() {
@@ -408,7 +421,7 @@ export const useDriveStore = defineStore('drive', () => {
 
       const cidKey = scrollKey()
       if (cidKey !== prevCidKey) {
-        scrollPositions.set(prevCidKey, window.scrollY)
+        rememberScroll(prevCidKey, window.scrollY)
         prevCidKey = cidKey
         window.scrollTo({ top: 0, behavior: 'instant' })
         navigate()

@@ -42,16 +42,42 @@ function setupStorageHarness(page: Parameters<typeof setupHarness>[0]) {
 }
 
 /** 生成指定文件集合对应的新版原生列表文档。 */
-function storageHtml(files: Array<{ cid?: string, fid?: string, n: string, s: number }>) {
+function storageHtml(
+  files: Array<{ cid?: string, fid?: string, n: string, s: number }>,
+  nativeActions = false,
+) {
   return `<!DOCTYPE html>
 <html>
-<head><meta charset="utf-8" /><title>115 新版长列表</title></head>
+<head>
+  <meta charset="utf-8" />
+  <title>115 新版长列表</title>
+  <style>
+    .native-hover-actions { display: none; }
+    .file-list-item:hover > .file-list-item > .native-hover-actions { display: flex; }
+  </style>
+</head>
 <body>
   <main id="new-storage-root">
     <div data-file-scroll style="height: 600px; overflow-y: auto">
       ${files.map(item => `
         <div class="file-list-item" data-file-id="${item.fid ?? item.cid ?? ''}">
           <div class="group relative file-list-item">
+            ${nativeActions
+              ? `
+              <div class="native-hover-actions hidden group-hover:flex absolute left-0 right-0">
+                <div class="flex items-center bg-white">
+                  <div data-menu-action="下载"><button title="下载">下载</button></div>
+                  <div data-menu-action="分享"><button title="分享">分享</button></div>
+                  <div data-menu-action="移动"><button title="移动">移动</button></div>
+                  <div data-menu-action="重命名"><button title="重命名">重命名</button></div>
+                  <div data-menu-action="置顶"><button title="置顶">置顶</button></div>
+                  <div data-menu-action="星标"><button title="星标">星标</button></div>
+                  <div data-menu-action="删除"><button title="删除">删除</button></div>
+                  <div><button title="更多">更多</button></div>
+                </div>
+              </div>
+            `
+              : ''}
             <div class="flex items-center">
               <div class="file-name-responsive" title="${item.n}">${item.n}</div>
               <div class="file-info-responsive">${(item.s / 1024 / 1024 / 1024).toFixed(2)} GB</div>
@@ -177,6 +203,159 @@ function storageGridHtml(files: Array<{ cid?: string, fid?: string, n: string }>
 }
 
 test.describe('新版 115 原生文件列表适配', () => {
+  test('新版播放和 ED2K 入口合并到原生文件悬停操作条', async ({ page }) => {
+    /*
+     * ================================================================================
+     * 步骤1：验证新版操作入口合并
+     * ================================================================================
+     * 目标：不再为 Fusion 创建常驻独立操作条，入口只在文件悬停时随原生操作显示。
+     * 数据源：带原生悬停操作条的新版文件列表夹具。
+     * 操作：
+     * 1) 核对附加区不含独立操作条
+     * 2) 悬停文件行后核对原生条同时包含播放、ED2K 和原生操作
+     */
+    await setupHarness(page, {
+      mocks: (api) => {
+        api.override(/^https:\/\/115\.com\/storage\/allfiles/, async ({ route, request }) => {
+          if (!request.isNavigationRequest())
+            return
+          await route.fulfill({
+            contentType: 'text/html; charset=utf-8',
+            headers: { ...CORS, 'origin-agent-cluster': '?0' },
+            body: storageHtml(items, true),
+          })
+          return true
+        })
+        api.override(FILES_RE, ({ route }) => json(route, filesRes({
+          cid: '0',
+          name: '根目录',
+          items,
+        }, 0, 1150)))
+        api.override(/^https:\/\/(www\.javbus\.com|www\.javlibrary\.com|javdb\.com|missav\.ws)\//, ({ route }) => {
+          return json(route, { state: false }, 404)
+        })
+      },
+    })
+    await page.goto(OFFICIAL_STORAGE_URL)
+
+    const row = page.locator('.file-list-item[data-file-id="official-file-1"]')
+    const addon = row.locator('[data-115master-row-addon]')
+    const actions = row.locator('[data-115master-merged-actions]')
+    await expect(addon.locator('[data-115master-native-actions]')).toHaveCount(0)
+    await expect(actions).toHaveCount(1)
+    await expect(actions).toBeHidden()
+    await row.hover()
+    await expect(actions).toBeVisible()
+    await expect(actions.locator('a.master-player')).toHaveText('▶️ Master 播放')
+    await expect(actions.locator('a[class="115-player"]')).toHaveText('5️⃣ 官方播放')
+    await expect(actions.locator('a.ed2k-link')).toHaveText('ED2K')
+    await expect(actions.getByRole('button', { name: '下载' })).toBeVisible()
+    await expect(actions.locator('[data-115master-native-action-group]')).toHaveCount(1)
+    const visualEntries = actions.locator([
+      '[data-115master-native-action-group] > a',
+      '[data-115master-native-action-group] > [data-115master-native-menu]',
+    ].join(', '))
+    await expect.poll(() => visualEntries.evaluateAll((nodes) => {
+      /*
+       * ================================================================================
+       * 步骤2：核对悬停操作条视觉顺序
+       * ================================================================================
+       * 目标：验证新版操作入口按旧版从左到右显示，而不是误把 DOM 插入顺序当成 UI 顺序。
+       * 数据源：操作条直接子节点的屏幕坐标和文字。
+       * 操作：
+       * 1) 读取每个入口的实际布局位置
+       * 2) 按从上到下、从左到右排序后核对旧版顺序
+       */
+      return nodes
+        .map(node => ({
+          text: node.textContent?.trim() ?? '',
+          rect: node.getBoundingClientRect(),
+        }))
+        .sort((left, right) => left.rect.top - right.rect.top || left.rect.left - right.rect.left)
+        .map(node => node.text)
+    })).toEqual([
+      '▶️ Master 播放',
+      '5️⃣ 官方播放',
+      'ED2K',
+      '置顶',
+      '星标',
+      '下载',
+      '移动',
+      '重命名',
+      '删除',
+      '分享',
+      '更多',
+    ])
+  })
+
+  test('新版原生悬停条延迟出现后回收独立兼容操作条', async ({ page }) => {
+    /*
+     * ================================================================================
+     * 步骤1：验证延迟原生操作条接管
+     * ================================================================================
+     * 目标：React 延迟绘制原生操作条时，Fusion 不保留先前创建的独立兼容条。
+     * 数据源：先无操作条、再异步插入原生结构的新版文件列表夹具。
+     * 操作：
+     * 1) 等待 Fusion 首轮创建独立兼容条
+     * 2) 插入新版原生操作条并核对 Fusion 自动迁移
+     */
+    await setupHarness(page, {
+      mocks: (api) => {
+        api.override(/^https:\/\/115\.com\/storage\/allfiles/, async ({ route, request }) => {
+          if (!request.isNavigationRequest())
+            return
+          await route.fulfill({
+            contentType: 'text/html; charset=utf-8',
+            headers: { ...CORS, 'origin-agent-cluster': '?0' },
+            body: storageHtml(items),
+          })
+          return true
+        })
+        api.override(FILES_RE, ({ route }) => json(route, filesRes({
+          cid: '0',
+          name: '根目录',
+          items,
+        }, 0, 1150)))
+        api.override(/^https:\/\/(www\.javbus\.com|www\.javlibrary\.com|javdb\.com|missav\.ws)\//, ({ route }) => {
+          return json(route, { state: false }, 404)
+        })
+      },
+    })
+    await page.goto(OFFICIAL_STORAGE_URL)
+
+    const row = page.locator('.file-list-item[data-file-id="official-file-1"]')
+    const addon = row.locator('[data-115master-row-addon]')
+    await expect(addon.locator('[data-115master-native-actions]')).toHaveCount(1)
+    await expect(row.locator('[data-115master-merged-actions]')).toHaveCount(0)
+
+    await row.evaluate((node) => {
+      const interactionRow = node.querySelector<HTMLElement>(':scope > .group.relative.file-list-item')
+      if (!interactionRow)
+        throw new Error('缺少新版原生交互行')
+      interactionRow.insertAdjacentHTML('afterbegin', `
+        <div class="native-hover-actions hidden group-hover:flex absolute left-0 right-0">
+          <div class="flex items-center bg-white">
+            <div data-menu-action="下载"><button title="下载">下载</button></div>
+            <div data-menu-action="分享"><button title="分享">分享</button></div>
+            <div data-menu-action="移动"><button title="移动">移动</button></div>
+            <div data-menu-action="重命名"><button title="重命名">重命名</button></div>
+            <div data-menu-action="置顶"><button title="置顶">置顶</button></div>
+            <div data-menu-action="星标"><button title="星标">星标</button></div>
+            <div data-menu-action="删除"><button title="删除">删除</button></div>
+            <div><button title="更多">更多</button></div>
+          </div>
+        </div>
+      `)
+    })
+
+    const actions = row.locator('[data-115master-merged-actions]')
+    await expect(actions).toHaveCount(1)
+    await expect(addon.locator('[data-115master-native-actions]')).toHaveCount(0)
+    await expect(actions.locator('[data-115master-native-action-group]')).toHaveCount(1)
+    await expect(actions.locator('a.master-player')).toHaveText('▶️ Master 播放')
+    await expect(actions.locator('a.ed2k-link')).toHaveText('ED2K')
+  })
+
   test('后台标签暂停动画帧时仍完成首屏文件增强', async ({ page }) => {
     /**
      * ================================================================================
@@ -457,8 +636,8 @@ test.describe('新版 115 原生文件列表适配', () => {
       rows.map(row => row.getAttribute('data-115master-file-key')),
     )).toEqual(items.map(item => item.fid))
 
-    await expect(sora.locator('a.master-player')).toHaveText('Master 播放')
-    await expect(sora.locator('a[class="115-player"]')).toHaveText('官方播放')
+    await expect(sora.locator('a.master-player')).toHaveText('▶️ Master 播放')
+    await expect(sora.locator('a[class="115-player"]')).toHaveText('5️⃣ 官方播放')
     await expect(sora.locator('a[menu="download_one"]')).toHaveText('下载')
     expect(errors).toEqual([])
   })
@@ -1545,8 +1724,8 @@ test.describe('新版 115 原生文件列表适配', () => {
       .toHaveAttribute('data-115master-av-number', 'MURIKURI-009')
     await expect(secondAddon.locator('[data-115master-preview]'))
       .toHaveAttribute('data-115master-pick-code', 'official-pick-2')
-    await expect(secondAddon.locator('a.master-player')).toHaveText('Master 播放')
-    await expect(secondAddon.locator('a[class="115-player"]')).toHaveText('官方播放')
+    await expect(secondAddon.locator('a.master-player')).toHaveText('▶️ Master 播放')
+    await expect(secondAddon.locator('a[class="115-player"]')).toHaveText('5️⃣ 官方播放')
     await expect(secondAddon.locator('a[menu="download_one"]')).toHaveText('下载')
     await expect.poll(() => secondAddon.locator('[data-115master-detail]').evaluate(detail => Boolean(detail.shadowRoot))).toBe(true)
     await expect.poll(() => secondAddon.locator('[data-115master-preview]').evaluate(preview => Boolean(preview.shadowRoot))).toBe(true)
@@ -1743,8 +1922,8 @@ test.describe('新版 115 原生文件列表适配', () => {
     await expect(panel.locator('[data-115master-detail]')).toHaveAttribute('data-115master-av-number', 'SORA-636')
     await expect(panel.locator('[data-115master-preview]')).toHaveCount(1)
     await expect(panel.locator('[data-115master-preview]')).toHaveAttribute('data-115master-pick-code', 'official-pick-1')
-    await expect(panel.locator('a.master-player')).toHaveText('Master 播放')
-    await expect(panel.locator('a[class="115-player"]')).toHaveText('官方播放')
+    await expect(panel.locator('a.master-player')).toHaveText('▶️ Master 播放')
+    await expect(panel.locator('a[class="115-player"]')).toHaveText('5️⃣ 官方播放')
     await expect.poll(() => panel.locator('[data-115master-detail]').evaluate(detail => Boolean(detail.shadowRoot))).toBe(true)
     await expect.poll(() => panel.locator('[data-115master-preview]').evaluate(preview => Boolean(preview.shadowRoot))).toBe(true)
     await expect(panel.getByText('未找到番号 [SORA-636] 信息')).toBeVisible()

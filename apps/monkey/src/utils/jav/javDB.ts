@@ -6,6 +6,33 @@ import { isSameAvNumber, Jav, JAV_SOURCE } from './jav'
 const logger = appLogger.sub('JavDB')
 
 /**
+ * ================================================================================
+ * 步骤1：读取 JavDB 封面地址
+ * ================================================================================
+ * 目标：兼容 JavDB 延迟加载封面，优先使用 data-src 中的真实地址。
+ * 数据源：详情页 img.video-cover 的 data-src 和 src 属性。
+ * 操作：
+ * 1) 优先读取 data-src
+ * 2) 忽略空值和 data: 占位地址
+ * 3) 没有真实 data-src 时回退 src
+ */
+function readCoverUrl(dom: Document): string | undefined {
+  logger.info('开始读取 JavDB 封面地址')
+
+  const image = dom.querySelector('img.video-cover')
+  const candidates = [
+    image?.getAttribute('data-src'),
+    image?.getAttribute('src'),
+  ]
+  const cover = candidates
+    .map(value => value?.trim())
+    .find(value => Boolean(value) && !value!.startsWith('data:'))
+
+  logger.info('JavDB 封面地址读取完成', cover ?? '')
+  return cover
+}
+
+/**
  * JavDB 类
  */
 export class JavDB extends Jav {
@@ -183,7 +210,7 @@ export class JavDB extends Jav {
   }
 
   parseCover(dom: Document) {
-    const cover = dom.querySelector('img.video-cover')?.getAttribute('src')
+    const cover = readCoverUrl(dom)
     return cover
       ? {
           url: new URL(cover, this.baseUrl).href,
@@ -205,9 +232,7 @@ export class JavDB extends Jav {
      */
     logger.info('开始解析 JavDB 单页封面')
 
-    const cover = dom.querySelector('img.video-cover')
-      ?.getAttribute('src')
-      || dom.querySelector('img.video-cover')?.getAttribute('data-src')
+    const cover = readCoverUrl(dom)
     if (!cover) {
       logger.info('JavDB 单页封面解析完成，无封面')
       return undefined

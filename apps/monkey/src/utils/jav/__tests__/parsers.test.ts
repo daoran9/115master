@@ -87,6 +87,36 @@ describe('jav source parsers', () => {
     testLogger.info('JavDB 单页封面映射验证完成')
   })
 
+  it('javDB 延迟加载封面优先读取 data-src', () => {
+    /*
+     * ================================================================================
+     * 步骤1：验证 JavDB 延迟封面地址优先级
+     * ================================================================================
+     * 目标：避免把 lazy-load 占位 src 送入图片加载器。
+     * 数据源：详情页 video-cover 的 data-src 和占位 src。
+     * 操作：
+     * 1) 同时提供真实 data-src 与 data: 占位 src
+     * 2) 核对双页和单页封面都使用真实地址
+     */
+    testLogger.info('开始验证 JavDB 延迟封面地址优先级')
+
+    const parser = new JavDB()
+    parser.detailUrl = 'https://javdb.com/v/example'
+    const dom = documentOf(`
+      <img class="video-cover" data-src="https://c0.jdbstatic.com/covers/kk/example.jpg" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==">
+    `)
+
+    expect(parser.parseCover(dom)).toEqual({
+      url: 'https://c0.jdbstatic.com/covers/kk/example.jpg',
+      referer: parser.detailUrl,
+    })
+    expect(parser.parseCoverSingle(dom)).toEqual({
+      url: 'https://c0.jdbstatic.com/thumbs/kk/example.jpg',
+      referer: parser.detailUrl,
+    })
+    testLogger.info('JavDB 延迟封面地址优先级验证完成')
+  })
+
   it('javDB 搜索结果只选择精确番号', () => {
     /*
      * ================================================================================
