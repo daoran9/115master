@@ -201,6 +201,7 @@ const WINDOW_ACTION_MAP = withGroup({
    */
   toggleFullscreen: {
     name: '切换全屏',
+    allowInModal: true,
     keydown: (ctx) => {
       ctx.fullscreen?.toggleFullscreen()
     },
@@ -308,6 +309,7 @@ const EPISODE_ACTION_MAP = withGroup({
    */
   toggleShowSider: {
     name: '播放列表',
+    allowInModal: true,
     keydown: (ctx) => {
       ctx.fullscreen?.toggleShowSider()
     },

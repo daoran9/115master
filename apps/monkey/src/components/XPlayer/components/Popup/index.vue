@@ -1,8 +1,8 @@
 <template>
   <Teleport :to="portalContainer" :disabled="!portalContainer">
     <Transition
-      enter-active-class="transition-opacity duration-200"
-      leave-active-class="transition-opacity duration-200"
+      enter-active-class="transition-opacity duration-200 ease-[var(--ui-ease-enter)]"
+      leave-active-class="transition-opacity duration-200 ease-[var(--ui-ease-exit)]"
       enter-from-class="opacity-0"
       leave-to-class="opacity-0"
       @enter="onEnter"
@@ -11,7 +11,8 @@
       <div
         v-show="visibleModel"
         ref="popupRef"
-        :class="[styles.popup, variants[props.variant]]"
+        class="ui-glass-panel"
+        :class="styles.popup"
         :style="style"
         v-bind="$attrs"
       >
@@ -46,7 +47,6 @@ const props = withDefaults(defineProps<Props>(), {
   y: 0,
   outsideStopPropagation: false,
   allowPreventControlsClose: true,
-  variant: 'floating',
 })
 
 const emit = defineEmits<{
@@ -63,12 +63,6 @@ const styles = clsx({
       'overflow-hidden',
     ],
 })
-
-const variants = {
-  floating: 'ui-glass-floating',
-  overlay: 'ui-glass-overlay',
-  panel: 'ui-glass-panel',
-} as const
 
 interface Props {
   /** 是否显示 */
@@ -87,8 +81,6 @@ interface Props {
   outsideStopPropagation?: boolean
   /** 允许阻止控制栏关闭 */
   allowPreventControlsClose?: boolean
-  /** Glass 承载场景 */
-  variant?: keyof typeof variants
 }
 
 const { container } = usePortal()

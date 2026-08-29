@@ -4,10 +4,12 @@ import { GM_info } from '$'
 import { computed, defineComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import PKG from '@/../package.json'
 import ThemeToggle from '@/components/ThemeToggle'
+import { useDriveListMode } from '@/hooks/useDriveListMode'
 import { I, Icon } from '@/icons'
 import { useUserSetting } from '@/utils/userSettings'
+import AccountPreferences from './AccountPreferences'
 
-export type PreferenceSection = 'appearance' | 'enhancements' | 'about'
+export type PreferenceSection = 'appearance' | 'files' | 'enhancements' | 'account' | 'about'
 
 interface SectionItem {
   id: PreferenceSection
@@ -16,7 +18,9 @@ interface SectionItem {
 }
 
 export const PREFERENCE_SECTIONS: SectionItem[] = [
+  { id: 'account', label: '账号', icon: I.ACCOUNT },
   { id: 'appearance', label: '外观', icon: I.THEME_LIGHT },
+  { id: 'files', label: '文件列表', icon: I.LIST },
   { id: 'enhancements', label: '增强', icon: I.EXTENSION },
   { id: 'about', label: '关于', icon: I.ABOUT },
 ]
@@ -65,9 +69,11 @@ const PreferencesContent = defineComponent({
 
   emits: {
     'update:section': (_section: PreferenceSection) => true,
+    'loggedOut': () => true,
   },
 
   setup(props, { emit }) {
+    const mode = useDriveListMode()
     const preview = useUserSetting('enableFilelistPreview')
     const avInfo = useUserSetting('enableAvInfo')
     const actressFaces = useUserSetting('enableActressFaces')
@@ -108,7 +114,7 @@ const PreferencesContent = defineComponent({
           {/* 桌面端:始终显示左侧菜单,移动端:仅在 menu 层级显示 */}
           <nav
             class={[
-              'border-base-content/10 flex shrink-0 flex-col gap-1 self-start sm:w-40 sm:border-r sm:pr-3',
+              'border-base-content/10 flex shrink-0 flex-col gap-1 sm:w-40 sm:border-r sm:pr-3',
               showMenu
                 ? 'w-full'
                 : 'hidden sm:flex',
@@ -119,7 +125,7 @@ const PreferencesContent = defineComponent({
                 key={section.id}
                 type="button"
                 class={[
-                  'flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
+                  'flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ease-[var(--ui-ease-standard)]',
                   display.value === section.id
                     ? 'bg-base-content/10 text-base-content font-medium'
                     : 'text-base-content/60 hover:bg-base-content/5 hover:text-base-content',
@@ -136,7 +142,7 @@ const PreferencesContent = defineComponent({
           {/* 移动端 menu 层级不可见、section 层级显示;桌面端反之 */}
           <div
             class={[
-              'flex-1 overflow-y-auto sm:pr-1 sm:pl-3',
+              'flex-1 sm:pr-1 sm:pl-3',
               showMenu ? 'hidden sm:block' : 'block',
             ]}
           >
@@ -148,6 +154,31 @@ const PreferencesContent = defineComponent({
                 </div>
                 <ThemeToggle />
               </div>
+            )}
+
+            {display.value === 'files' && (
+              <div class="flex flex-col gap-4">
+                <div>
+                  <h3 class="text-base-content text-sm font-medium">加载方式</h3>
+                  <p class="text-base-content/60 mt-1 text-xs">选择使用分页器，或在滚动到底部时继续加载。</p>
+                </div>
+                <label class="flex flex-col gap-2" for="drive-list-load-mode">
+                  <span class="text-base-content/80 text-xs">文件列表加载方式</span>
+                  <select
+                    id="drive-list-load-mode"
+                    class="select select-bordered select-sm w-full max-w-xs"
+                    value={mode.value}
+                    onChange={event => mode.value = (event.target as HTMLSelectElement).value as typeof mode.value}
+                  >
+                    <option value="pagination">分页加载</option>
+                    <option value="infinite">滚动无限加载</option>
+                  </select>
+                </label>
+              </div>
+            )}
+
+            {display.value === 'account' && (
+              <AccountPreferences onLoggedOut={() => emit('loggedOut')} />
             )}
 
             {display.value === 'enhancements' && (

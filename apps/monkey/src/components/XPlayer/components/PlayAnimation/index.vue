@@ -18,7 +18,7 @@ const styles = clsx({
   container: [
     'absolute inset-0 m-auto',
     'flex items-center justify-center',
-    'size-20 rounded-full bg-black/30 drop-shadow-xs/60',
+    'size-20 rounded-full bg-black/30 text-white drop-shadow-xs/60',
   ],
   icon: 'size-[61.8%]',
 })
@@ -31,7 +31,7 @@ const shouldAnimate = shallowRef(false)
 /** 计算动画类名 */
 const animationClass = computed(() => {
   if (shouldAnimate.value) {
-    return 'animate-[fadeOut_350ms_linear_forwards]'
+    return 'animate-[fadeOut_350ms_var(--ui-ease-linear)_forwards]'
   }
   return ''
 })

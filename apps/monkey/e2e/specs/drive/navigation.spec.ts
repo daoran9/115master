@@ -1,8 +1,19 @@
 import { expect, test } from '@playwright/test'
 import { FILES_RE } from '../../support'
-import { boot, record, row, rows, watch } from './helpers'
+import { boot, record, row, watch } from './helpers'
 
 test.describe('目录导航', () => {
+  test('星标页：面包屑显示星标', async ({ page }) => {
+    const errors = watch(page)
+    await boot(page)
+
+    await page.getByRole('link', { name: '星标', exact: true }).click()
+
+    await expect(page).toHaveURL(/#\/drive\/star$/)
+    await expect(page.locator('.breadcrumbs [aria-current="page"]')).toHaveText('星标')
+    expect(errors).toEqual([])
+  })
+
   test('点文件夹进入子目录：hash 变化、按新 cid 请求、渲染子目录', async ({ page }) => {
     const errors = watch(page)
     const reqs = record(page, FILES_RE)
@@ -13,7 +24,7 @@ test.describe('目录导航', () => {
     /** hash 路由 /drive/:area?/:cid? → #/drive/1001 */
     await expect(page).toHaveURL(/#\/drive\/1001$/)
     /** 渲染子目录 12 项 */
-    await expect(rows(page)).toHaveCount(12)
+    await expect(page.getByRole('list', { name: '文件列表' })).toHaveAttribute('data-file-list-total', '12')
     await expect(row(page, '动漫 第01话.mp4')).toBeVisible()
 
     /** 发出了 cid=1001 的 /files 请求 */
@@ -43,9 +54,9 @@ test.describe('目录导航', () => {
     /** handleClickPath 以 cid='' 导航 → #/drive/ */
     await expect(page).toHaveURL(/#\/drive\/?$/)
     await expect(row(page, '演示视频 01.mp4')).toBeVisible()
-    await expect(rows(page)).toHaveCount(43)
+    await expect(page.getByRole('list', { name: '文件列表' })).toHaveAttribute('data-file-list-total', '43')
 
-    /** 返回后再次请求根目录（SWR 重新校验） */
+    /** 返回后不复用旧结果，再次请求根目录 */
     const back = reqs.filter(r => r.url.searchParams.get('cid') === '0')
     expect(back.length).toBeGreaterThanOrEqual(2)
 
@@ -61,10 +72,10 @@ test.describe('目录导航', () => {
 
     await page.goBack()
 
-    /** 回到根目录：缓存命中立即渲染（SWR 后台重新校验） */
+    /** 回到根目录后重新请求并渲染 */
     await expect(page).toHaveURL(/#\/drive\/0?$/)
     await expect(row(page, '演示视频 01.mp4')).toBeVisible()
-    await expect(rows(page)).toHaveCount(43)
+    await expect(page.getByRole('list', { name: '文件列表' })).toHaveAttribute('data-file-list-total', '43')
 
     /** 再次前进到子目录 */
     await page.goForward()

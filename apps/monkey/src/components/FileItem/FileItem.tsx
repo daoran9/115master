@@ -4,8 +4,7 @@ import type { PropType } from 'vue'
 import type { FileDndSourceBindings, FileDndTargetBindings } from '../FileDnd'
 import { unrefElement } from '@vueuse/core'
 import { defineComponent, withModifiers } from 'vue'
-import { useContextmenu } from '@/hooks/useContextmenu'
-import { useLongPress } from '@/hooks/useLongPress'
+import { useViewportVisibility } from '@/hooks/useViewportVisibility'
 import ExtInfo from '@/pages/home/components/ExtInfo/index.vue'
 import { getFilesItemId } from '@/utils/filesItem'
 import { FileDndSource, FileDndTarget } from '../FileDnd'
@@ -27,6 +26,14 @@ const FileItem = defineComponent({
       type: Object as PropType<Share.Entity.FilesItem>,
       required: true,
     },
+    index: {
+      type: Number,
+      default: 0,
+    },
+    setsize: {
+      type: Number,
+      default: 0,
+    },
     pathSelect: {
       type: Boolean,
       default: false,
@@ -44,15 +51,11 @@ const FileItem = defineComponent({
       default: false,
     },
     onClick: {
-      type: Function as PropType<(data: Share.Entity.FilesItem) => void>,
+      type: Function as PropType<(event: MouseEvent) => void>,
       default: () => {},
     },
     onChecked: {
       type: Function as PropType<(checked: boolean) => void>,
-      default: () => {},
-    },
-    onRadio: {
-      type: Function as PropType<() => void>,
       default: () => {},
     },
     /** 拖拽激活时惰性求值被拖项（自动勾选当前项后返回全集） */
@@ -109,46 +112,15 @@ const FileItem = defineComponent({
       asc: props.asc,
       onPreview: props.onPreview,
     })
+    const inViewport = useViewportVisibility(itemRef)
 
-    /** 长按：200ms 选中该项；多选态交给点击与拖拽处理。 */
-    const longPressFired = useLongPress(itemRef, {
-      disabled: () => props.pathSelect || props.selectMode,
-      moveTolerance: e => e.pointerType === 'mouse' ? 6 : 10,
-      threshold: 200,
-      onTrigger: () => {
-        if (!props.checked)
-          props.onChecked(true)
-      },
-    })
-
-    function handleClick(e: Event) {
-      // 长按刚触发（进入选择模式），吞掉随后合成的 click，避免又触发单击打开
-      if (longPressFired.value) {
-        longPressFired.value = false
-        return
-      }
-      // 路径选择模式
-      if (props.pathSelect) {
-        props.onClick?.(props.data)
-        return
-      }
-
-      // 非信任点击（自动化点击），直接打开
-      if (!e.isTrusted) {
-        open()
-        return
-      }
-
-      props.onClick?.(props.data)
+    function handleClick(event: Event) {
+      props.onClick(event as MouseEvent)
     }
 
     function handleMouseDown(e: MouseEvent) {
       e.stopPropagation()
     }
-
-    useContextmenu(itemRef, (e) => {
-      props.onContextmenu?.(e)
-    })
 
     /** 触摸仅在多选态启用；路径选择模式保持禁用。 */
     function disabled(event: PointerEvent) {
@@ -175,25 +147,25 @@ const FileItem = defineComponent({
             data-[dropzone=true]:bg-primary/10
             data-[dropzone=true]:ring-primary
             hover:bg-base-content/5
-            data-[view-type=list]:even:bg-base-content/[0.03]
+            data-[view-type=list]:data-[stripe=even]:bg-base-content/[0.03]
             data-[view-type=list]:hover:bg-base-content/5
-            dark:data-[view-type=list]:even:bg-base-content/5
+            dark:data-[view-type=list]:data-[stripe=even]:bg-base-content/5
             dark:data-[view-type=list]:hover:bg-base-content/10
             relative
             flex
             min-w-0
             rounded-xs
-            transition
+            transition ease-[var(--ui-ease-standard)]
             data-[checked=true]:bg-linear-to-br
             data-[dragging=true]:opacity-30
             data-[dropzone=true]:ring-2
             data-[dropzone=true]:ring-inset
-            data-[view-type=card]:h-full
             data-[view-type=card]:flex-col
             data-[view-type=card]:rounded-2xl
             data-[view-type=card]:data-[checked=true]:ring-6
             data-[view-type=list]:flex-wrap
             data-[view-type=list]:items-stretch
+            data-[view-type=list]:overflow-x-clip
             max-sm:select-none
             max-sm:[-webkit-touch-callout:none]
           `,
@@ -202,12 +174,21 @@ const FileItem = defineComponent({
             data-checked={props.checked}
             data-dragging={props.dragging}
             data-dropzone={hovering}
+            data-file-list-index={props.index}
+            data-in-viewport={inViewport.value}
             data-select-mode={props.selectMode}
+            data-stripe={props.index % 2 === 1 ? 'even' : 'odd'}
             data-view-type={props.viewType}
+            aria-posinset={props.index + 1}
+            aria-setsize={props.setsize || undefined}
+            role="listitem"
+            onContextmenu={event => props.onContextmenu(event)}
           >
             {/* 复选框 */}
             <FileItemCheckbox
+              key={props.viewType}
               checked={props.checked}
+              animate={inViewport.value}
               pathSelect={props.pathSelect}
               selectMode={props.selectMode}
               onChecked={props.onChecked}
@@ -216,15 +197,23 @@ const FileItem = defineComponent({
 
             {/* 链接区域 */}
             <Link
-              class="
+              class={[
+                `
+            focus-visible:outline-primary
             cursor-default
-            group-data-[select-mode=true]:cursor-pointer
-            group-data-[view-type=card]:flex group-data-[view-type=card]:min-w-0
-            group-data-[view-type=card]:flex-1 group-data-[view-type=card]:flex-col
-            group-data-[view-type=list]:flex group-data-[view-type=list]:min-w-0
-            group-data-[view-type=list]:flex-1 group-data-[view-type=list]:items-center
-            group-data-[view-type=list]:gap-3 group-data-[view-type=list]:py-1
-          "
+            group-data-[select-mode=true]:cursor-pointer group-data-[view-type=card]:flex
+            group-data-[view-type=card]:min-w-0 group-data-[view-type=card]:flex-1
+            group-data-[view-type=card]:flex-col group-data-[view-type=list]:flex
+            group-data-[view-type=list]:min-w-0 group-data-[view-type=list]:flex-1
+            group-data-[view-type=list]:items-center group-data-[view-type=list]:gap-3
+            group-data-[view-type=list]:py-1
+            focus:outline-none focus-visible:outline-2
+          `,
+                inViewport.value
+                  ? 'group-data-[view-type=list]:transition-[padding-left] group-data-[view-type=list]:duration-300 group-data-[view-type=list]:ease-out motion-reduce:transition-none'
+                  : '',
+                props.selectMode && props.viewType === 'list' ? 'pl-9' : '',
+              ]}
               {...link.value}
               draggable={false}
               onClickCapture={withModifiers(handleClick, ['prevent'])}

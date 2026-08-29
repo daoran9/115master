@@ -1,3 +1,10 @@
+export { ActionMenu } from './components/ActionMenu/ActionMenu'
+export type {
+  ActionMenuGroup,
+  ActionMenuItem,
+  ActionMenuProps,
+  ActionMenuTone,
+} from './components/ActionMenu/ActionMenu'
 export { Button } from './components/Button/Button'
 export type {
   ButtonColor,
@@ -7,9 +14,17 @@ export type {
   ButtonType,
   ButtonVariant,
 } from './components/Button/Button'
+export { useCollectionSelection } from './components/CollectionSelection/useCollectionSelection'
+export type {
+  CollectionSelectionAdapter,
+  CollectionSelectionBind,
+  CollectionSelectionMenu,
+  CollectionSelectionOptions,
+} from './components/CollectionSelection/useCollectionSelection'
 export { ContextMenu } from './components/ContextMenu/ContextMenu'
 export type {
   ContextMenuCloseReason,
+  ContextMenuMaterial,
   ContextMenuPosition,
   ContextMenuProps,
   ContextMenuTarget,
@@ -17,7 +32,6 @@ export type {
 export { Dialog } from './components/Dialog/Dialog'
 export type {
   DialogCloseReason,
-  DialogInitialFocus,
   DialogProps,
   DialogSize,
 } from './components/Dialog/Dialog'
@@ -38,15 +52,59 @@ export type {
   DialogServiceMessages,
   DialogServiceOptions,
 } from './components/Dialog/service'
+export { default as DndMonitor } from './components/Dnd/DndMonitor'
+export { default as DndRoot } from './components/Dnd/DndRoot'
+export { default as DndSource } from './components/Dnd/DndSource'
+export { default as DndTarget } from './components/Dnd/DndTarget'
+export type {
+  DndOffset,
+  DndSourceBindings,
+  DndTargetBindings,
+} from './components/Dnd/useDnd'
+export { Drawer } from './components/Drawer/Drawer'
+export type {
+  DrawerCloseReason,
+  DrawerPlacement,
+  DrawerProps,
+  DrawerSize,
+} from './components/Drawer/Drawer'
+export { Empty } from './components/Empty/Empty'
+export type { EmptyProps, EmptySize } from './components/Empty/Empty'
+export { FloatingDock } from './components/FloatingDock/FloatingDock'
+export type {
+  FloatingDockContentKey,
+  FloatingDockProps,
+} from './components/FloatingDock/FloatingDock'
+export { Header } from './components/Header/Header'
+export type { HeaderProps } from './components/Header/Header'
+export { HeaderEnd } from './components/Header/HeaderEnd'
+export { HeaderStart } from './components/Header/HeaderStart'
+export { Image } from './components/Image/Image'
+export type {
+  ImageFallback,
+  ImageFit,
+  ImageLoader,
+  ImageProps,
+  ImageResource,
+} from './components/Image/Image'
+export { ModalHost } from './components/Modal/ModalHost'
+export type {
+  ModalDismissReason,
+  ModalInitialFocus,
+} from './components/Modal/ModalRoot'
 export { NavigationStack } from './components/NavigationStack/NavigationStack'
 export type {
   NavigationStackDirection,
-  NavigationStackDismissReason,
-  NavigationStackMobilePresentation,
   NavigationStackPageKey,
   NavigationStackProps,
 } from './components/NavigationStack/NavigationStack'
 export { OverlayHost } from './components/OverlayHost/OverlayHost'
+export { Pagination } from './components/Pagination/Pagination'
+export type {
+  PaginationLabels,
+  PaginationProps,
+  PaginationSurface,
+} from './components/Pagination/Pagination'
 export { Pill } from './components/Pill/Pill'
 export type {
   PillAs,
@@ -54,6 +112,23 @@ export type {
   PillSize,
   PillVariant,
 } from './components/Pill/Pill'
+export { Progress } from './components/Progress/Progress'
+export type { ProgressProps } from './components/Progress/Progress'
+export { ResponsiveMenu } from './components/ResponsiveMenu/ResponsiveMenu'
+export type {
+  ResponsiveMenuProps,
+  ResponsiveMenuTrigger,
+} from './components/ResponsiveMenu/ResponsiveMenu'
+export { scrollbar } from './components/Scrollbar/Scrollbar'
+export type { ScrollbarSize } from './components/Scrollbar/Scrollbar'
+export { SelectionHeader } from './components/SelectionHeader/SelectionHeader'
+export type { SelectionHeaderProps } from './components/SelectionHeader/SelectionHeader'
+export { StatusFeedback } from './components/StatusFeedback/StatusFeedback'
+export type {
+  StatusFeedbackProps,
+  StatusFeedbackSize,
+  StatusFeedbackStatus,
+} from './components/StatusFeedback/StatusFeedback'
 export { Tooltip } from './components/Tooltip/Tooltip'
 export type {
   TooltipPlacement,

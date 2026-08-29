@@ -26,7 +26,7 @@ main.ts (run-at: document-start)
 src/
 ├── main.ts               # 入口：document.domain 设置 + URL 路由分发
 ├── app/                  # MASTER SPA 骨架
-│   ├── app.tsx           # App 根（OverlayHost + Dialog/Toast + RouterView/KeepAlive）
+│   ├── app.tsx           # App 根（OverlayHost + Dialog/Toast + RouterView）
 │   ├── router.ts         # createWebHashHistory + 旧播放页重定向
 │   └── routes.ts         # drive / video / test 路由
 ├── pages/
@@ -75,9 +75,9 @@ src/
 ### MASTER SPA
 
 - `createMasterApp()`（`app/index.ts`）— 重置文档（favicon、meta viewport、`#my-app`、滚动条样式）、注入主题、挂载 Vue + Pinia + router。
-- 路由（hash）：`/drive/:area?/:cid?`（网盘，`keepAlive`）、`/video/:pickCode`（播放）、`/test`。
-- App 根（`app.tsx`，TSX）— `onErrorCaptured` 全局兜底，`<KeepAlive>` 包裹 `meta.keepAlive` 路由。
-- 网盘页 `drive.tsx` 用 `actionAtom`/`actionConfig` 声明式描述右键菜单 action，由 `FileContextMenu` 渲染。
+- 路由（hash）：`/drive/:area?/:cid?`（网盘）、`/video/:pickCode`（播放）、`/test`。
+- App 根（`app.tsx`，TSX）— `onErrorCaptured` 全局兜底，`RouterView` 直接渲染当前路由页面。
+- 网盘页 `drive.tsx` 用 `ActionMenuGroup` 声明式描述操作，由 `@115master/ui` 的 `ActionMenu` 渲染；同一分组也供 `ActionBar` 消费。
 
 ### 状态管理：Pinia store + hooks 组合
 
@@ -87,15 +87,14 @@ src/
 useDriveStore
 ├── query      useRouteQuery (keyword/suffix/type/page) + useStorage (pageSize)
 ├── nav        usePathNav(router)                 # 路由参数 ↔ cid/area
-├── explorer   useDriveExplorer                   # 编排器
-│   ├── useDriveList   数据请求
-│   ├── useDrivePage   分页
-│   └── useDriveCache  按目录缓存 + 滚动位置恢复
+├── list       useDriveList                       # 请求、分页/无限加载与排序
 └── selection  useDriveSelection
 ```
 
-- `useDriveExplorer` watch `cid/area/page/size/keyword`，自动 `refresh()`；后退优先命中 `useDriveCache` 恢复滚动位置。
-- `useDriveAction` 聚合文件操作（newFolder/top/star/move/delete/cloudDownload…），每个 action 拆到子 hook；store 的 `afterAction()` 统一做 refresh + 清选 + 失效缓存。
+- `useDriveList` 是文件列表的数据接口，内部统一管理请求、分页/无限加载、排序与并发取消；Drive 页与 FileBrowser 都只提供导航和筛选状态。
+- 文件列表结果不缓存；目录、搜索、分页、排序或筛选条件变化时清空当前数据并重新请求。无限模式仅保留当前视图已经加载的页。
+- 文件列表不记录滚动位置；查询条件变化或重新进入 Drive 路由时从顶部开始。
+- `useDriveAction` 聚合文件操作（newFolder/top/star/move/delete/cloudDownload…），每个 action 拆到子 hook；store 的 `afterAction()` 统一清选并重新请求当前列表，不做本地增量更新或目标目录失效。
 - URL 状态走 `@vueuse/router`，UI 偏好走 `@vueuse/core` `useStorage`，跨会话持久。
 
 ### drive115 集成
@@ -155,6 +154,9 @@ new Drive115({
   - `xl`（72rem）— 文件浏览器等宽幅列表/树（`useFileBrowserDialog` 默认）。
   - `full` — 仅沉浸式场景，目前无业务使用。
   - 注意：size 仅在 ≥640px 断点生效，移动端各档渲染一致（底部抽屉）。
+- **Modal Surface**：MASTER 与独立 Vue 挂载各自只放一个 `ModalHost`；`DialogHost`、声明式 `Dialog` 和 `Drawer` 都必须位于其下。模态边缘面板使用 UI `Drawer`（原生 top layer），`ui-z-sheet` 只用于不阻断页面的 page drawer。
+- **NavigationStack 组合**：NavigationStack 只负责受控内容导航，不拥有 open 状态或模态外壳；桌面偏好设置组合 `Dialog size="lg"`，移动端组合 bottom `Drawer size="lg"`。调用方拥有页面标识、层级和关闭状态。
+- **Drawer 尺寸**：优先使用 `sm / md / lg / full` 语义档；确有连续响应宽度时只覆盖公共 `--ui-drawer-size`，不依赖 UI 内部 panel 类或自定义 z-index。
 - **TSX + SFC 混用**：App 骨架、drive 页用 `.tsx`（`defineComponent` + JSX）；UI 组件多用 `.vue` SFC。
 - **路径别名**：`@/` → `src/`。
 - **错误处理**：业务异常经 `drive115` 的 `onError` 回调收敛为 `action`，UI 据 `action` 决定行为，不识别具体错误码。

@@ -170,7 +170,7 @@ test.describe('播放器影片详情图片', () => {
     const crossSourceFallback = page.locator('a[href="https://images.e2e.local/raw-failed.jpg"]')
     await valid.scrollIntoViewIfNeeded()
     await expect(valid).toBeVisible()
-    await expect(valid.locator('img')).toHaveAttribute('data-origin-src', 'https://images.e2e.local/raw-ok.jpg')
+    await expect(valid.locator('img')).toHaveAttribute('data-ui-image-origin', 'https://images.e2e.local/raw-ok.jpg')
     await expect(valid.locator('img')).toHaveAttribute('src', /^blob:/)
     await expect(gmFallback).toBeVisible()
     await expect(gmFallback.locator('img')).toHaveAttribute('src', /^blob:/)
@@ -442,12 +442,12 @@ test.describe('播放器影片详情图片', () => {
     await expect(page.getByText('NMSL-045 gfriends 头像回归', { exact: true })).toBeVisible()
     const actor = page.locator('img[alt="藤田ゆず"]')
     await expect(actor).toHaveAttribute('src', /^blob:/)
-    await expect(actor).toHaveAttribute('data-origin-src', /gfriends\/gfriends@latest\/Content\/7-Moodyz\//)
+    await expect(actor).toHaveAttribute('data-ui-image-origin', /gfriends\/gfriends@latest\/Content\/7-Moodyz\//)
     for (const source of ['JavBus', 'JavLibrary', 'JavDB']) {
       // 1.1 每个资料标签都必须保留同一个 gfriends 主选头像。
       await page.locator('a.tab', { hasText: source }).click()
       await expect(page.locator('a.tab-active')).toHaveText(source)
-      await expect(actor).toHaveAttribute('data-origin-src', /gfriends\/gfriends@latest\/Content\/7-Moodyz\//)
+      await expect(actor).toHaveAttribute('data-ui-image-origin', /gfriends\/gfriends@latest\/Content\/7-Moodyz\//)
     }
     const requests = await gmRequests(page)
     expect(requests.some(request => request.url.includes('gfriends/gfriends@latest/Content/7-Moodyz/')))

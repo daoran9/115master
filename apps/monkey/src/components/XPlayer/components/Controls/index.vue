@@ -14,8 +14,8 @@ import { clsx } from '@/utils/clsx'
 const styles = clsx({
   root: [
     'absolute inset-0 flex flex-col',
-    'transition-all duration-500 ease-[var(--app-ease-out-cubic)]',
-    'data-[mask="true"]:bg-base-100/50',
+    'transition-all duration-500 ease-[var(--ui-ease-standard)]',
+    'data-[mask="true"]:bg-black/50',
   ],
 })
 

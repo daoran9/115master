@@ -51,6 +51,7 @@
     "@libmedia/avplayer": "^1.2.2",
     "@libmedia/avutil": "^1.2.0",
     "@libmedia/common": "^2.2.0",
+    "@tanstack/vue-virtual": "^3.13.35",
     "@vueuse/components": "^14.1.0",
     "@vueuse/core": "^14.1.0",
     "@vueuse/math": "^14.1.0",
@@ -65,6 +66,7 @@
     "lodash": "^4.17.21",
     "m3u8-parser": "^7.2.0",
     "mitt": "^3.0.1",
+    "motion-v": "^2.3.0",
     "photoswipe": "^5.4.4",
     "pinia": "^3.0.3",
     "tailwindcss": "^4.1.7",
@@ -111,6 +113,7 @@
     "vite-plugin-mkcert": "^2.1.0",
     "vite-plugin-monkey": "^5.0.5",
     "vite-plugin-static-copy": "^2.3.0",
+    "vite-plugin-vue-devtools": "^8.2.1",
     "vite-svg-loader": "^5.1.0",
     "vitest": "^4.1.8",
     "vue-tsc": "^2.2.10"

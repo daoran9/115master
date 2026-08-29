@@ -1,32 +1,27 @@
+import type { ActionMenuGroup } from '@115master/ui'
 import type { TagFormState } from './TagFormContent'
 import type { Tag } from '@/store/tagList'
-import type { Action } from '@/types/action'
 import { Api, Core } from '@115master/drive115'
-import { Button, Pill } from '@115master/ui'
+import { ActionMenu, Button, FloatingDock, Header, HeaderEnd, HeaderStart, Pill, Progress, SelectionHeader, StatusFeedback } from '@115master/ui'
 import { useTitle } from '@vueuse/core'
 import { useRouteQuery } from '@vueuse/router'
 import { computed, defineComponent, h, onBeforeMount, reactive, ref, watch } from 'vue'
 import { useAppDialog } from '@/app/dialog'
 import {
   ActionBar,
-  ActionMenu,
-  Header,
-  HeaderEnd,
-  HeaderStart,
   Layout,
-  LoadingError,
   Main,
-  Progress,
-  SelectionHeader,
   Sider,
   SiderContent,
   useToast,
 } from '@/components'
-import { useMultiSelect } from '@/hooks/useMultiSelect'
 import { I, Icon } from '@/icons'
 import { useTagStore } from '@/store/tagList'
+import { actionIcon } from '@/utils/action'
+import { errorFeedback } from '@/utils/errorFeedback'
 import TagFormContent from './TagFormContent'
 import TagItem from './TagItem'
+import { useTagSelection } from './useTagSelection'
 
 const { LabelColor } = Api.TagApi.Req
 
@@ -47,18 +42,7 @@ const Tags = defineComponent({
 
     /** 框选 / 点空白容器：列表可视区（不含 SelectionHeader，避免点头部按钮被误判为点空白） */
     const listRef = ref<HTMLElement>()
-    const multi = useMultiSelect<Tag>({
-      container: () => listRef.value,
-      list: () => store.filtered,
-      key: t => t.id,
-      selection: {
-        has: t => store.isSelected(t.id),
-        toggle: (t, on) => store.toggle(t.id, on),
-        clear: store.clearSelection,
-        selectAll: store.selectAll,
-      },
-      count: () => store.selectedCount,
-    })
+    const multi = useTagSelection(store, () => listRef.value)
 
     const emptyText = computed(() =>
       store.keyword ? '无匹配标签' : '暂无标签，点击右上角「新建标签」',
@@ -148,46 +132,46 @@ const Tags = defineComponent({
     }
 
     /** 右键菜单：编辑（仅单选）/ 删除（批量，作用于全部选中） */
-    const contextActions = computed<Action[][]>(() => [
+    const contextActions = computed<ActionMenuGroup[]>(() => [
       [{
-        name: 'edit',
+        id: 'edit',
         label: '编辑',
-        icon: I.RENAME,
-        show: () => store.selectedCount === 1,
-        onClick: () => {
+        leading: actionIcon(I.RENAME),
+        visible: () => store.selectedCount === 1,
+        onSelect: () => {
           const tag = store.filtered.find(t => store.isSelected(t.id))
           if (tag)
             openTagForm(tag)
         },
       }],
       [{
-        name: 'delete',
+        id: 'delete',
         label: '删除',
-        icon: I.DELETE,
-        iconColor: 'text-error',
-        onClick: () => deleteBatch(),
+        leading: actionIcon(I.DELETE),
+        tone: 'destructive',
+        onSelect: () => deleteBatch(),
       }],
     ])
 
     /** 底部操作栏：编辑（仅单选）/ 批量删除 */
-    const batchActions = computed<Action[][]>(() => [[
+    const batchActions = computed<ActionMenuGroup[]>(() => [[
       {
-        name: 'edit',
+        id: 'edit',
         label: '编辑',
-        icon: I.RENAME,
-        show: () => store.selectedCount === 1,
-        onClick: () => {
+        leading: actionIcon(I.RENAME),
+        visible: () => store.selectedCount === 1,
+        onSelect: () => {
           const tag = store.filtered.find(t => store.isSelected(t.id))
           if (tag)
             openTagForm(tag)
         },
       },
       {
-        name: 'delete',
+        id: 'delete',
         label: '批量删除',
-        icon: I.DELETE,
-        iconColor: 'text-error',
-        onClick: () => deleteBatch(),
+        leading: actionIcon(I.DELETE),
+        tone: 'destructive',
+        onSelect: () => deleteBatch(),
       },
     ]])
 
@@ -222,9 +206,16 @@ const Tags = defineComponent({
         return (
           <SelectionHeader
             count={store.selectedCount}
+            countLabel="项"
+            exitLabel="退出多选"
             onExit={multi.exit}
-            onSelectAll={() => store.selectAll()}
-            onInvert={multi.invert}
+            allSelected={multi.allSelected.value}
+            selectAllLabel="全选"
+            onSelectAll={multi.selectAll}
+            v-slots={{
+              exitIcon: () => <Icon class="text-xl" name={I.CLOSE} />,
+              selectAllIcon: () => <Icon class="text-xl" name={I.SELECT_ALL} />,
+            }}
           />
         )
       }
@@ -260,10 +251,10 @@ const Tags = defineComponent({
       if (store.error) {
         return (
           <div class="flex flex-1 items-center justify-center pt-20">
-            <LoadingError
-              message={store.error}
-              retryable
-              retryText="重试"
+            <StatusFeedback
+              status="error"
+              {...errorFeedback(store.error)}
+              retryLabel="重试"
               onRetry={() => store.load()}
             />
           </div>
@@ -271,7 +262,7 @@ const Tags = defineComponent({
       }
       const list = store.filtered
       return (
-        <div ref={listRef} class="relative flex-1 px-3 pb-24 sm:px-5">
+        <div ref={listRef} class="relative flex-1 pb-20">
           <Progress active={store.loading} />
           {!store.loading && list.length === 0 && (
             <div class="text-base-content/60 flex flex-col items-center justify-center gap-3 pt-24">
@@ -280,7 +271,7 @@ const Tags = defineComponent({
             </div>
           )}
           {!store.loading && list.length > 0 && (
-            <ul class="grid grid-cols-1 gap-1.5 pt-3 sm:gap-1">
+            <ul class="grid w-full grid-cols-1 gap-1 pt-5">
               {list.map(tag => (
                 <TagItem
                   key={tag.id}
@@ -288,7 +279,7 @@ const Tags = defineComponent({
                   selected={store.isSelected(tag.id)}
                   selectMode={multi.selectMode.value}
                   {...multi.itemProps(tag)}
-                  onToggle={on => store.toggle(tag.id, on)}
+                  onToggle={on => multi.set(tag, on)}
                   onEdit={() => openTagForm(tag)}
                   onDelete={() => deleteTag(tag)}
                 />
@@ -300,7 +291,7 @@ const Tags = defineComponent({
     }
 
     return () => (
-      <div class="flex h-full flex-col">
+      <div class="flex h-full flex-col [--main-content-gutter:calc(var(--spacing)*3)] [--ui-header-gutter:var(--main-content-gutter)] sm:[--main-content-gutter:calc(var(--spacing)*6)]">
         <Layout class="[--navbar-frosted-glass-height:var(--navbar-height)]">
           <Sider>
             <SiderContent />
@@ -308,16 +299,20 @@ const Tags = defineComponent({
           <Main class="relative flex min-h-screen flex-col">
             <ListHeader />
             <ListArea />
-            {multi.selectMode.value && store.selectedCount > 0 && (
-              <div class="ui-z-elevated pointer-events-none fixed right-0 bottom-16 left-(--sider-width) flex items-center justify-center">
-                <ActionBar groups={batchActions.value} />
-              </div>
-            )}
+            <div class="ui-z-elevated pointer-events-none fixed right-0 bottom-16 left-(--sider-width) flex items-center justify-center">
+              <FloatingDock contentKey={multi.selectMode.value && store.selectedCount > 0 ? 'actions' : null}>
+                <ActionBar embedded groups={batchActions.value} />
+              </FloatingDock>
+            </div>
             <ActionMenu
-              show={multi.contextmenuShow.value}
+              aria-label="标签操作"
+              groups={contextActions.value}
+              open={multi.contextmenuShow.value}
               position={multi.contextmenuPosition.value}
-              actionConfig={contextActions.value}
-              onClose={multi.closeContextmenu}
+              onUpdate:open={(open) => {
+                if (!open)
+                  multi.closeContextmenu()
+              }}
             />
           </Main>
         </Layout>

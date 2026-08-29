@@ -2,7 +2,65 @@
   "name": "UI Storybook",
   "stories": [
     {
-      "id": "ui-navigationstack--navigation",
+      "id": "foundations-motion--comparison",
+      "docs": "foundations-motion--docs",
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "foundations-motion--comparison:compares-every-semantic-curve-from-an-inert-starting-point"
+      ],
+      "ready": "main[aria-labelledby=\"ui-motion-comparison-title\"]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-motion-position]",
+          "text": "起点"
+        }
+      ]
+    },
+    {
+      "id": "foundations-motion--magnetic-snap",
+      "docs": "foundations-motion--docs",
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "foundations-motion--magnetic-snap:settles-at-the-magnetic-target-after-an-explicit-action"
+      ],
+      "ready": "main[aria-labelledby=\"ui-motion-snap-title\"]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-motion-snap-position]",
+          "text": "起点"
+        }
+      ]
+    },
+    {
+      "id": "foundations-motion--reduced-motion",
+      "docs": "foundations-motion--docs",
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "foundations-motion--reduced-motion:preserves-the-outcome-while-removing-reduced-motion-interpolation"
+      ],
+      "ready": "main[aria-labelledby=\"ui-motion-reduced-title\"]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-motion-preference]",
+          "text": "完整动态效果"
+        },
+        {
+          "selector": "[data-ui-motion-reduced-position]",
+          "text": "起点"
+        }
+      ]
+    },
+    {
+      "id": "ui-navigationstack--composition",
       "docs": "ui-navigationstack--docs",
       "component": true,
       "tags": [
@@ -10,12 +68,12 @@
         "test"
       ],
       "tests": [
-        "ui-navigationstack--navigation:proves-navigation-dismissal-focus-and-responsive-presentation"
+        "ui-navigationstack--composition:fills-dialog-and-drawer-surfaces-and-emits-a-close-intent"
       ],
-      "ready": "main[aria-label=\"Navigation Stack\"]",
+      "ready": "[data-ui-navigation-composition]",
       "outcomes": [
         {
-          "selector": "[data-ui-navigation-dismiss]",
+          "selector": "[data-ui-navigation-composition]",
           "text": "idle"
         },
         {
@@ -25,7 +83,160 @@
       ]
     },
     {
-      "id": "ui-watermark--contract",
+      "id": "ui-navigationstack--navigation",
+      "docs": "ui-navigationstack--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-navigationstack--navigation:infers-forward-replace-and-back-across-multiple-depths-while-animating-bottom-height"
+      ],
+      "ready": "[data-ui-navigation-result]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-navigation-result]",
+          "text": "idle"
+        },
+        {
+          "selector": "dialog[open]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-drawer--placements",
+      "docs": "ui-drawer--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-drawer--placements:slides-every-placement-in-from-its-anchored-edge-and-exposes-the-bottom-drag-handle"
+      ],
+      "ready": "main[aria-label=\"Drawer placements\"]",
+      "outcomes": [
+        {
+          "selector": "dialog[open]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-drawer--sizes",
+      "docs": "ui-drawer--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-drawer--sizes:maps-bottom-semantic-sizes-to-panel-heights-and-permits-a-placement-axis-css-override"
+      ],
+      "ready": "main[aria-label=\"Drawer sizes\"]",
+      "outcomes": [
+        {
+          "selector": "dialog[open]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-drawer--lifecycle",
+      "docs": "ui-drawer--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-drawer--lifecycle:settles-lifecycle-applies-dismissal-policies-and-restores-trigger-focus"
+      ],
+      "ready": "[data-ui-drawer-phase]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-drawer-phase]",
+          "text": "idle"
+        },
+        {
+          "selector": "[data-ui-drawer-reason]",
+          "text": "none"
+        },
+        {
+          "selector": "dialog[open]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-drawer--swipe",
+      "docs": "ui-drawer--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-drawer--swipe:dismisses-past-the-threshold-and-snaps-back-after-rejection-or-cancellation"
+      ],
+      "ready": "[data-ui-drawer-swipe-reason]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-drawer-swipe-reason]",
+          "text": "none"
+        },
+        {
+          "selector": "dialog[open]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-drawer--reduced-motion",
+      "docs": "ui-drawer--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-drawer--reduced-motion:settles-immediately-when-reduced-motion-is-active"
+      ],
+      "ready": "[data-ui-drawer-reduced-phase]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-drawer-reduced-phase]",
+          "text": "idle"
+        },
+        {
+          "selector": "dialog[open]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "integrations-modalhost--mixed-stacks",
+      "docs": "integrations-modalhost--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "integrations-modalhost--mixed-stacks:coordinates-drawer-to-dialog-and-drawer-to-drawer-stacks-with-a-complete-focus-chain"
+      ],
+      "ready": "main[aria-label=\"Modal Host behavior\"]",
+      "outcomes": [
+        {
+          "selector": "dialog[open]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-watermark--behavior",
       "docs": "ui-watermark--docs",
       "component": true,
       "tags": [
@@ -33,7 +244,7 @@
         "test"
       ],
       "tests": [
-        "ui-watermark--contract:proves-repeated-decoration-and-content-interaction"
+        "ui-watermark--behavior:keeps-decoration-inert-above-interactive-content"
       ],
       "ready": "[data-ui-watermark-actions]",
       "outcomes": [
@@ -44,7 +255,7 @@
       ]
     },
     {
-      "id": "ui-button--contract",
+      "id": "ui-button--interaction",
       "docs": "ui-button--docs",
       "component": true,
       "tags": [
@@ -52,22 +263,106 @@
         "test"
       ],
       "tests": [
-        "ui-button--contract:executes-the-public-interaction-contract"
+        "ui-button--interaction:supports-pointer-and-keyboard-actions-and-exposes-unavailable-states"
       ],
       "ready": "[data-ui-button-actions]",
       "outcomes": [
         {
           "selector": "[data-ui-button-actions]",
           "text": "0"
+        }
+      ]
+    },
+    {
+      "id": "ui-button--native-form",
+      "docs": "ui-button--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-button--native-form:preserves-native-button-submit-and-reset-behavior"
+      ],
+      "ready": "[data-ui-button-form-actions]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-button-form-actions]",
+          "text": "0"
         },
         {
           "selector": "[data-ui-button-submits]",
+          "text": "0"
+        },
+        {
+          "selector": "[data-ui-button-resets]",
           "text": "0"
         }
       ]
     },
     {
-      "id": "ui-overlayhost--theme-scoped-target",
+      "id": "ui-progress--toggle",
+      "docs": "ui-progress--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-progress--toggle:finishes-and-restarts-the-visual-loading-indicator"
+      ],
+      "ready": "[data-ui-progress-state]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-progress-state]",
+          "text": "active"
+        },
+        {
+          "selector": "[data-ui-progress]",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "ui-selectionheader--behavior",
+      "docs": "ui-selectionheader--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-selectionheader--behavior:invokes-the-configured-selection-actions"
+      ],
+      "ready": "[data-ui-selection-header-result]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-selection-header-result]",
+          "text": "idle"
+        }
+      ]
+    },
+    {
+      "id": "ui-statusfeedback--behavior",
+      "docs": "ui-statusfeedback--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-statusfeedback--behavior:invokes-retry-close-and-detail-actions"
+      ],
+      "ready": "[data-ui-status-feedback-result]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-status-feedback-result]",
+          "text": "idle"
+        }
+      ]
+    },
+    {
+      "id": "ui-overlayhost--default",
       "docs": "ui-overlayhost--docs",
       "component": true,
       "tags": [
@@ -75,7 +370,7 @@
         "test"
       ],
       "tests": [
-        "ui-overlayhost--theme-scoped-target:proves-theme-scoped-target-ownership"
+        "ui-overlayhost--default:hosts-an-accessible-transient-overlay-inside-the-current-theme"
       ],
       "ready": "[data-ui-overlay-host]",
       "outcomes": [
@@ -86,7 +381,7 @@
       ]
     },
     {
-      "id": "ui-contextmenu--contract",
+      "id": "ui-contextmenu--positioning",
       "docs": "ui-contextmenu--docs",
       "component": true,
       "tags": [
@@ -94,12 +389,50 @@
         "test"
       ],
       "tests": [
-        "ui-contextmenu--contract:proves-positioning-focus-host-ownership-and-dismissal"
+        "ui-contextmenu--positioning:positions-at-coordinates-and-avoids-viewport-edges"
       ],
-      "ready": "button:has-text(\"右键打开菜单\")",
+      "ready": "main[aria-label=\"Context Menu 定位\"]",
       "outcomes": [
         {
-          "selector": "[data-ui-context-menu-result]",
+          "selector": "[role=\"menu\"]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-contextmenu--keyboard-navigation",
+      "docs": "ui-contextmenu--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-contextmenu--keyboard-navigation:cycles-keyboard-focus-and-restores-the-trigger"
+      ],
+      "ready": "main[aria-label=\"Context Menu 键盘交互\"]",
+      "outcomes": [
+        {
+          "selector": "[role=\"menu\"]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-contextmenu--dismissal",
+      "docs": "ui-contextmenu--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-contextmenu--dismissal:reports-escape-and-backdrop-dismissal"
+      ],
+      "ready": "main[aria-label=\"Context Menu 关闭语义\"]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-context-menu-reason]",
           "text": "idle"
         },
         {
@@ -109,39 +442,43 @@
       ]
     },
     {
-      "id": "ui-tooltip--interaction",
-      "docs": "ui-tooltip--docs",
+      "id": "ui-contextmenu--scroll-locking",
+      "docs": "ui-contextmenu--docs",
       "component": true,
       "tags": [
         "autodocs",
         "test"
       ],
       "tests": [
-        "ui-tooltip--interaction:proves-pointer-keyboard-and-aria-behavior"
+        "ui-contextmenu--scroll-locking:locks-and-restores-the-targeted-scroll-container"
       ],
-      "ready": "button:has-text(\"说明触发器\")",
+      "ready": "main[aria-label=\"Context Menu 滚动锁定\"]",
       "outcomes": [
         {
-          "selector": "[role=\"tooltip\"]",
+          "selector": "[data-ui-context-menu-scroll]",
+          "scrollTop": 0
+        },
+        {
+          "selector": "[role=\"menu\"]",
           "count": 0
         }
       ]
     },
     {
-      "id": "ui-tooltip--content-slots-and-empty-content",
-      "docs": "ui-tooltip--docs",
+      "id": "ui-contextmenu--overlay-targets",
+      "docs": "ui-contextmenu--docs",
       "component": true,
       "tags": [
         "autodocs",
         "test"
       ],
       "tests": [
-        "ui-tooltip--content-slots-and-empty-content:proves-slot-and-empty-content-behavior"
+        "ui-contextmenu--overlay-targets:resolves-explicit-hosted-and-fallback-targets"
       ],
-      "ready": "button:text-is(\"slot 内容\")",
+      "ready": "main[aria-label=\"Context Menu 浮层目标\"]",
       "outcomes": [
         {
-          "selector": "[role=\"tooltip\"]",
+          "selector": "[role=\"menu\"]",
           "count": 0
         }
       ]
@@ -155,9 +492,9 @@
         "test"
       ],
       "tests": [
-        "ui-tooltip--placements:proves-the-four-preferred-placements"
+        "ui-tooltip--placements:uses-each-public-preferred-placement"
       ],
-      "ready": "button:has-text(\"top\")",
+      "ready": "main[aria-label=\"Tooltip 首选方向\"]",
       "outcomes": [
         {
           "selector": "[role=\"tooltip\"]",
@@ -166,7 +503,7 @@
       ]
     },
     {
-      "id": "ui-tooltip--edge-and-scroll",
+      "id": "ui-tooltip--content",
       "docs": "ui-tooltip--docs",
       "component": true,
       "tags": [
@@ -174,9 +511,47 @@
         "test"
       ],
       "tests": [
-        "ui-tooltip--edge-and-scroll:proves-edge-collision-and-scroll-tracking"
+        "ui-tooltip--content:renders-slot-content-and-omits-empty-descriptions"
       ],
-      "ready": "button:has-text(\"边缘触发器\")",
+      "ready": "main[aria-label=\"Tooltip 内容\"]",
+      "outcomes": [
+        {
+          "selector": "[role=\"tooltip\"]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-tooltip--positioning",
+      "docs": "ui-tooltip--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-tooltip--positioning:flips-away-from-the-viewport-edge"
+      ],
+      "ready": "main[aria-label=\"Tooltip 视口避让\"]",
+      "outcomes": [
+        {
+          "selector": "[role=\"tooltip\"]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-tooltip--scroll-tracking",
+      "docs": "ui-tooltip--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-tooltip--scroll-tracking:tracks-its-anchor-while-the-container-scrolls"
+      ],
+      "ready": "main[aria-label=\"Tooltip 滚动跟随\"]",
       "outcomes": [
         {
           "selector": "[role=\"tooltip\"]",
@@ -197,9 +572,9 @@
         "test"
       ],
       "tests": [
-        "ui-tooltip--overlay-targets:proves-overlay-host-and-target-ownership"
+        "ui-tooltip--overlay-targets:resolves-hosted-explicit-and-body-fallback-targets"
       ],
-      "ready": "button:has-text(\"Host 触发器\")",
+      "ready": "main[aria-label=\"Tooltip 浮层目标\"]",
       "outcomes": [
         {
           "selector": "[role=\"tooltip\"]",
@@ -208,86 +583,143 @@
       ]
     },
     {
-      "id": "ui-pill--containers",
-      "docs": "ui-pill--docs",
+      "id": "ui-tooltip--interaction",
+      "docs": "ui-tooltip--docs",
       "component": true,
       "tags": [
         "autodocs",
         "test"
       ],
       "tests": [
-        "ui-pill--containers:proves-container-semantics"
+        "ui-tooltip--interaction:supports-delayed-pointer-and-keyboard-accessible-disclosure"
       ],
-      "ready": ".ui-pill:has-text(\"已选 5 项\")",
-      "outcomes": []
-    },
-    {
-      "id": "ui-pill--link",
-      "docs": "ui-pill--docs",
-      "component": true,
-      "tags": [
-        "autodocs",
-        "test"
-      ],
-      "tests": [
-        "ui-pill--link:proves-navigation-semantics-and-focus"
-      ],
-      "ready": "a[href=\"#library\"]",
+      "ready": "main[aria-label=\"Tooltip 交互\"]",
       "outcomes": [
         {
-          "selector": "a[href=\"#library\"]",
+          "selector": "[role=\"tooltip\"]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-pill--navigation",
+      "docs": "ui-pill--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-pill--navigation:exposes-native-link-semantics-and-keyboard-focus"
+      ],
+      "ready": "a[href=\"#details\"]",
+      "outcomes": [
+        {
+          "selector": "a[href=\"#details\"]",
           "focused": false
         }
       ]
     },
     {
-      "id": "ui-pill--sizes",
-      "docs": "ui-pill--docs",
-      "component": true,
+      "id": "foundations-theme--semantic-colors",
+      "docs": "foundations-theme--docs",
       "tags": [
         "autodocs",
         "test"
       ],
       "tests": [
-        "ui-pill--sizes:proves-the-public-size-scale"
+        "foundations-theme--semantic-colors:maps-the-same-semantic-roles-across-light-and-dark-themes"
       ],
-      "ready": ".ui-pill-xs",
-      "outcomes": []
-    },
-    {
-      "id": "ui-pill--variants",
-      "docs": "ui-pill--docs",
-      "component": true,
-      "tags": [
-        "autodocs",
-        "test"
-      ],
-      "tests": [
-        "ui-pill--variants:proves-plain-and-glass-variants"
-      ],
-      "ready": ".ui-pill:has-text(\"Plain\")",
-      "outcomes": []
-    },
-    {
-      "id": "foundations-theme-token-and-glass--tracer",
-      "docs": "foundations-theme-token-and-glass--docs",
-      "tags": [
-        "autodocs",
-        "test"
-      ],
-      "tests": [
-        "foundations-theme-token-and-glass--tracer:proves-theme-glass-and-semantic-action-contracts"
-      ],
-      "ready": "[data-ui-theme-actions]",
+      "ready": "main[aria-label=\"Theme 语义颜色映射\"]",
       "outcomes": [
         {
-          "selector": "[data-ui-theme-actions]",
-          "text": "0"
+          "selector": "[data-ui-theme-palette]",
+          "count": 2
+        },
+        {
+          "selector": "[data-ui-theme-color]",
+          "count": 22
         }
       ]
     },
     {
-      "id": "ui-dialog--controlled",
+      "id": "foundations-theme--selection",
+      "docs": "foundations-theme--docs",
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "foundations-theme--selection:keeps-inherited-and-explicit-theme-selection-observable"
+      ],
+      "ready": "main[aria-label=\"Theme 选择规则\"]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-theme-selection=\"inherited\"]",
+          "count": 1
+        },
+        {
+          "selector": "[data-ui-theme-selection=\"explicit\"]",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "id": "foundations-token--layering-scale",
+      "docs": "foundations-token--docs",
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "foundations-token--layering-scale:proves-token-utility-pairs-and-semantic-stacking-order"
+      ],
+      "ready": "[data-ui-token=\"watermark\"] [data-ui-token-value]:not(:empty)",
+      "outcomes": [
+        {
+          "selector": "[data-ui-token-value]:not(:empty)",
+          "count": 16
+        }
+      ]
+    },
+    {
+      "id": "foundations-glass--filter-ownership",
+      "docs": "foundations-glass--docs",
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "foundations-glass--filter-ownership:keeps-the-carrying-surface-as-the-only-backdrop-filter-owner"
+      ],
+      "ready": "[data-ui-glass-filter-owner]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-glass-nested-button]",
+          "focused": false
+        }
+      ]
+    },
+    {
+      "id": "foundations-glass--semantic-tones",
+      "docs": "foundations-glass--docs",
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "foundations-glass--semantic-tones:preserves-semantic-content-tones-on-filtered-surfaces"
+      ],
+      "ready": "[data-ui-glass-tone=\"warning\"]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-glass-tone]",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "id": "ui-dialog--lifecycle",
       "docs": "ui-dialog--docs",
       "component": true,
       "tags": [
@@ -295,9 +727,9 @@
         "test"
       ],
       "tests": [
-        "ui-dialog--controlled:proves-controlled-state-lifecycle-and-focus-behavior"
+        "ui-dialog--lifecycle:proves-controlled-state-lifecycle-and-focus-behavior"
       ],
-      "ready": "main[aria-label=\"Controlled Dialog\"]",
+      "ready": "main[aria-label=\"Dialog lifecycle\"]",
       "outcomes": [
         {
           "selector": "[data-ui-dialog-phase]",
@@ -310,7 +742,7 @@
       ]
     },
     {
-      "id": "ui-dialog--label-only",
+      "id": "ui-dialog--overflow",
       "docs": "ui-dialog--docs",
       "component": true,
       "tags": [
@@ -318,9 +750,28 @@
         "test"
       ],
       "tests": [
-        "ui-dialog--label-only:proves-the-label-only-accessible-name"
+        "ui-dialog--overflow:contains-boundary-scrolling-inside-the-dialog"
       ],
-      "ready": "main[aria-label=\"Label-only Dialog\"]",
+      "ready": "main[aria-label=\"Dialog overflow\"]",
+      "outcomes": [
+        {
+          "selector": "dialog[open]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-dialog--content",
+      "docs": "ui-dialog--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-dialog--content:proves-prop-slot-and-label-only-accessible-names"
+      ],
+      "ready": "main[aria-label=\"Dialog content\"]",
       "outcomes": [
         {
           "selector": "dialog[open]",
@@ -348,7 +799,7 @@
       ]
     },
     {
-      "id": "ui-dialog--close-policies",
+      "id": "ui-dialog--dismissal",
       "docs": "ui-dialog--docs",
       "component": true,
       "tags": [
@@ -356,9 +807,9 @@
         "test"
       ],
       "tests": [
-        "ui-dialog--close-policies:proves-escape-and-backdrop-close-policies"
+        "ui-dialog--dismissal:proves-escape-and-backdrop-close-policies"
       ],
-      "ready": "main[aria-label=\"Dialog close policies\"]",
+      "ready": "main[aria-label=\"Dialog dismissal\"]",
       "outcomes": [
         {
           "selector": "[data-ui-dialog-reason]",
@@ -371,7 +822,7 @@
       ]
     },
     {
-      "id": "ui-dialog--sizes-and-responsive-presentation",
+      "id": "ui-dialog--sizes",
       "docs": "ui-dialog--docs",
       "component": true,
       "tags": [
@@ -379,10 +830,14 @@
         "test"
       ],
       "tests": [
-        "ui-dialog--sizes-and-responsive-presentation:proves-sizes-and-responsive-presentation"
+        "ui-dialog--sizes:proves-sizes-and-responsive-presentation"
       ],
       "ready": "main[aria-label=\"Dialog sizes\"]",
       "outcomes": [
+        {
+          "selector": "[data-ui-dialog-size-phase]",
+          "text": "idle"
+        },
         {
           "selector": "dialog[open]",
           "count": 0
@@ -413,20 +868,21 @@
       ]
     },
     {
-      "id": "ui-dialog-service--factory-isolation-and-injection",
+      "id": "ui-dialog-service--default",
       "docs": "ui-dialog-service--docs",
+      "component": true,
       "tags": [
         "autodocs",
         "test"
       ],
       "tests": [
-        "ui-dialog-service--factory-isolation-and-injection:proves-factory-isolation-injection-and-missing-host-failure"
+        "ui-dialog-service--default:resolves-an-alert-and-restores-the-trigger"
       ],
-      "ready": "main[aria-label=\"Dialog service isolation\"]",
+      "ready": "main[aria-label=\"Default Dialog Service\"]",
       "outcomes": [
         {
-          "selector": "[data-ui-dialog-host-error]",
-          "text": "none"
+          "selector": "[data-ui-dialog-service-default]",
+          "text": "idle"
         },
         {
           "selector": "dialog[open]",
@@ -435,16 +891,59 @@
       ]
     },
     {
-      "id": "ui-dialog-service--outcomes-and-close-reasons",
+      "id": "ui-dialog-service--factory-isolation",
       "docs": "ui-dialog-service--docs",
+      "component": true,
       "tags": [
         "autodocs",
         "test"
       ],
       "tests": [
-        "ui-dialog-service--outcomes-and-close-reasons:proves-api-outcomes-and-structured-close-reasons"
+        "ui-dialog-service--factory-isolation:isolates-factory-instances-and-injects-the-nearest-service"
       ],
-      "ready": "main[aria-label=\"Dialog service outcomes\"]",
+      "ready": "main[aria-label=\"Dialog Service isolation\"]",
+      "outcomes": [
+        {
+          "selector": "dialog[open]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-dialog-service--host-requirement",
+      "docs": "ui-dialog-service--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-dialog-service--host-requirement:rejects-a-service-call-without-a-mounted-host"
+      ],
+      "ready": "main[aria-label=\"Dialog Service Host requirement\"]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-dialog-host-error]",
+          "text": "idle"
+        },
+        {
+          "selector": "dialog[open]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-dialog-service--outcomes",
+      "docs": "ui-dialog-service--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-dialog-service--outcomes:returns-alert-confirm-and-prompt-outcomes"
+      ],
+      "ready": "main[aria-label=\"Dialog Service outcomes\"]",
       "outcomes": [
         {
           "selector": "[data-ui-dialog-outcome]",
@@ -457,21 +956,91 @@
       ]
     },
     {
-      "id": "ui-dialog-service--errors-and-async-confirmation",
+      "id": "ui-dialog-service--enter-confirmation",
       "docs": "ui-dialog-service--docs",
+      "component": true,
       "tags": [
         "autodocs",
         "test"
       ],
       "tests": [
-        "ui-dialog-service--errors-and-async-confirmation:proves-render-and-confirmation-errors-plus-pending-protection"
+        "ui-dialog-service--enter-confirmation:confirms-on-enter-unless-the-call-disables-it"
       ],
-      "ready": "main[aria-label=\"Dialog service failures\"]",
+      "ready": "main[aria-label=\"Dialog Service Enter confirmation\"]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-dialog-enter]",
+          "text": "idle"
+        },
+        {
+          "selector": "dialog[open]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-dialog-service--close-reasons",
+      "docs": "ui-dialog-service--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-dialog-service--close-reasons:reports-each-public-close-reason-exactly-once"
+      ],
+      "ready": "main[aria-label=\"Dialog Service close reasons\"]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-dialog-reason]",
+          "text": "idle"
+        },
+        {
+          "selector": "dialog[open]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-dialog-service--error-handling",
+      "docs": "ui-dialog-service--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-dialog-service--error-handling:reports-render-and-confirmation-failures-through-caller-owned-outcomes"
+      ],
+      "ready": "main[aria-label=\"Dialog Service errors\"]",
       "outcomes": [
         {
           "selector": "[data-ui-dialog-error]",
           "text": "none:0"
         },
+        {
+          "selector": "[data-ui-dialog-rejection]",
+          "text": "idle"
+        },
+        {
+          "selector": "dialog[open]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-dialog-service--async-confirmation",
+      "docs": "ui-dialog-service--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-dialog-service--async-confirmation:locks-user-close-paths-while-pending-and-settles-once"
+      ],
+      "ready": "main[aria-label=\"Dialog Service pending confirmation\"]",
+      "outcomes": [
         {
           "selector": "[data-ui-dialog-async]",
           "text": "idle:0"
@@ -483,19 +1052,20 @@
       ]
     },
     {
-      "id": "ui-dialog-service--prompt-keyboard-and-validation",
+      "id": "ui-dialog-service--prompt-validation",
       "docs": "ui-dialog-service--docs",
+      "component": true,
       "tags": [
         "autodocs",
         "test"
       ],
       "tests": [
-        "ui-dialog-service--prompt-keyboard-and-validation:proves-prompt-keyboard-paths-validation-and-submitted-snapshots"
+        "ui-dialog-service--prompt-validation:announces-a-required-error-and-submits-the-corrected-value"
       ],
-      "ready": "main[aria-label=\"Prompt behavior\"]",
+      "ready": "main[aria-label=\"Dialog Service Prompt validation\"]",
       "outcomes": [
         {
-          "selector": "[data-ui-dialog-prompt]",
+          "selector": "[data-ui-dialog-prompt-validation]",
           "text": "idle"
         },
         {
@@ -505,20 +1075,179 @@
       ]
     },
     {
-      "id": "ui-dialog-service--stack-and-close-all",
+      "id": "ui-dialog-service--prompt-keyboard",
       "docs": "ui-dialog-service--docs",
+      "component": true,
       "tags": [
         "autodocs",
         "test"
       ],
       "tests": [
-        "ui-dialog-service--stack-and-close-all:proves-stack-focus-restoration-and-closeall-lifo"
+        "ui-dialog-service--prompt-keyboard:preserves-multiline-enter-and-honors-confirmonenter"
       ],
-      "ready": "main[aria-label=\"Dialog service Stack\"]",
+      "ready": "main[aria-label=\"Dialog Service Prompt keyboard\"]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-dialog-prompt-keyboard]",
+          "text": "idle"
+        },
+        {
+          "selector": "dialog[open]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-dialog-service--submitted-snapshot",
+      "docs": "ui-dialog-service--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-dialog-service--submitted-snapshot:returns-the-submitted-value-captured-before-async-confirmation"
+      ],
+      "ready": "main[aria-label=\"Dialog Service Prompt snapshot\"]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-dialog-prompt-snapshot]",
+          "text": "idle"
+        },
+        {
+          "selector": "dialog[open]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-dialog-service--stack",
+      "docs": "ui-dialog-service--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-dialog-service--stack:keeps-only-the-top-dialog-interactive-and-restores-parent-focus"
+      ],
+      "ready": "main[aria-label=\"Dialog Service Stack\"]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-dialog-stack]",
+          "text": "idle"
+        },
+        {
+          "selector": "dialog[open]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-actionmenu--default",
+      "docs": "ui-actionmenu--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-actionmenu--default:normalizes-groups-and-closes-after-selection"
+      ],
+      "ready": "main[aria-label=\"Action Menu behavior\"]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-action-menu-result]",
+          "text": "idle"
+        },
+        {
+          "selector": "[role=\"menu\"]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-contextmenu--materials",
+      "docs": "ui-contextmenu--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-contextmenu--materials:renders-distinct-floating-and-media-overlay-materials"
+      ],
+      "ready": "main[aria-label=\"Context Menu 材质\"]",
+      "outcomes": [
+        {
+          "selector": "[role=\"menu\"]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-pagination--behavior",
+      "docs": "ui-pagination--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-pagination--behavior:changes-pages-by-button-and-jump-input-then-changes-page-size"
+      ],
+      "ready": "[data-ui-pagination-result]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-pagination-result]",
+          "text": "5/30"
+        }
+      ]
+    },
+    {
+      "id": "ui-dialog-service--close-all",
+      "docs": "ui-dialog-service--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-dialog-service--close-all:closes-the-stack-in-lifo-order-and-restores-the-trigger"
+      ],
+      "ready": "main[aria-label=\"Dialog Service closeAll\"]",
       "outcomes": [
         {
           "selector": "[data-ui-dialog-order]",
           "text": ""
+        },
+        {
+          "selector": "dialog[open]",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "ui-responsivemenu--default",
+      "docs": "ui-responsivemenu--docs",
+      "component": true,
+      "tags": [
+        "autodocs",
+        "test"
+      ],
+      "tests": [
+        "ui-responsivemenu--default:switches-surfaces-by-viewport-and-preserves-dismissal-focus-and-selection-behavior",
+        "ui-responsivemenu--default:opens-the-desktop-menu-at-its-anchor-without-interpolating-placement"
+      ],
+      "ready": "[data-ui-responsive-menu-result]",
+      "outcomes": [
+        {
+          "selector": "[data-ui-responsive-menu-result]",
+          "text": "idle"
+        },
+        {
+          "selector": "[role=\"menu\"]",
+          "count": 0
         },
         {
           "selector": "dialog[open]",

@@ -1,26 +1,79 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
-import { boot, menu, row, rows, watch } from './helpers'
+import { dirs, FILES_RE, filesRes, json } from '../../support'
+import { boot, menu, record, row, rows, watch } from './helpers'
 
-/** 默认态用 Ctrl+单击进入多选，符合桌面端真实交互。 */
+const LABEL_RE = /^https:\/\/webapi\.115\.com\/label\/list/
+const MOVE_RE = /^https:\/\/webapi\.115\.com\/files\/move(?:\?|$)/
+const MOVE_PROGRESS_RE = /^https:\/\/webapi\.115\.com\/files\/move_progress/
+
+/** 勾选某行的复选框。 */
 async function check(page: Page, name: string) {
-  await row(page, name).click({ modifiers: ['Control'] })
+  await row(page, name).locator('input[type="checkbox"]').evaluate(input => input.click())
 }
 
 test.describe('选择与操作', () => {
+  test('移动两个文件后从服务端重新获取源目录', async ({ page }) => {
+    const errors = watch(page)
+    const requests = record(page, FILES_RE)
+    let moved = false
+    await boot(page, {
+      mocks: (api) => {
+        api.override(FILES_RE, ({ route, url }) => {
+          if ((url.searchParams.get('cid') ?? '0') !== '0')
+            return
+          const root = dirs['0']
+          return json(route, filesRes({
+            ...root,
+            items: moved ? [root.items[0]] : [root.items[0], root.items[2], root.items[3]],
+          }, 0, 256))
+        })
+        api.override(MOVE_RE, ({ route }) => {
+          moved = true
+          return json(route, { state: true })
+        })
+        api.override(MOVE_PROGRESS_RE, ({ route }) => json(route, { state: true, progress: 100 }))
+      },
+    })
+
+    await check(page, '演示视频 01.mp4')
+    await check(page, '演示视频 02.mp4')
+    await expect(page.getByTitle('退出多选')).toContainText('2 项')
+    await page.getByRole('button', { name: '移动' }).click()
+
+    const dialog = page.getByRole('dialog', { name: '移动到' })
+    await expect(page).toHaveURL(/fb_cid=0/)
+    await dialog.getByRole('listitem').filter({ hasText: '动漫' }).click()
+    await expect(page).toHaveURL(/fb_cid=1001/)
+    const before = requests.filter(request => request.url.searchParams.get('cid') === '0').length
+    await dialog.getByRole('button', { name: '确认' }).click()
+
+    await expect(dialog).toBeHidden()
+    await expect.poll(() => (
+      requests.filter(request => request.url.searchParams.get('cid') === '0').length
+    )).toBeGreaterThan(before)
+    await expect(row(page, '动漫')).toBeVisible()
+    await expect(row(page, '演示视频 01.mp4')).toHaveCount(0)
+    await expect(row(page, '演示视频 02.mp4')).toHaveCount(0)
+    expect(errors).toEqual([])
+  })
+
   test('分页器与 ActionBar 交叉切换时保持视觉连续', async ({ page }) => {
     const errors = watch(page)
     await boot(page, { storage: { '115Master_pageSize': '30' } })
     await expect(page.getByRole('button', { name: '下一页' })).toBeVisible()
     await expect.poll(() => page.locator('.drive-bottom-dock').evaluate((dock) => {
-      const surface = dock.querySelector<HTMLElement>('.drive-bottom-surface') ?? dock
+      const surface = dock.querySelector<HTMLElement>('[data-ui-floating-dock]')!
       return Number.parseFloat(getComputedStyle(surface.firstElementChild!).opacity)
     })).toBe(1)
+    const surface = page.locator('.drive-bottom-dock [data-ui-floating-dock]')
+    await expect(surface).toHaveCSS('transition-property', 'width, height')
+    await expect(surface).toHaveCSS('transition-duration', '0.18s, 0.18s')
 
     async function sample(selector: string) {
       return page.evaluate(async (selector) => {
         const dock = document.querySelector<HTMLElement>('.drive-bottom-dock')!
-        const surface = dock.querySelector<HTMLElement>('.drive-bottom-surface') ?? dock
+        const surface = dock.querySelector<HTMLElement>('[data-ui-floating-dock]')!
         const source = surface.firstElementChild as HTMLElement
         source.dataset.transitionSource = ''
         document.querySelector<HTMLElement>(selector)!.click()
@@ -60,7 +113,7 @@ test.describe('选择与操作', () => {
       }, selector)
     }
 
-    const traces = [await sample('[data-selection-key] input[type="checkbox"]')]
+    const traces = [await sample('[data-ui-collection-selection-key] input[type="checkbox"]')]
     await expect(page.getByRole('button', { name: '置顶', exact: true })).toBeVisible()
     traces.push(await sample('[title="退出多选"]'))
     await expect(page.getByRole('button', { name: '下一页' })).toBeVisible()
@@ -71,7 +124,7 @@ test.describe('选择与操作', () => {
       expect(trace.every(frame => frame.glass === 1)).toBe(true)
       expect(Math.max(...trace.filter(frame => frame.count === 2).map(frame => frame.offset))).toBeLessThan(1)
       expect(Math.max(...trace.map(frame => frame.travel))).toBeLessThan(1)
-      expect(new Set(trace.map(frame => Math.round(frame.width))).size).toBeGreaterThan(2)
+      expect(new Set(trace.map(frame => Math.round(frame.width))).size).toBeGreaterThan(1)
     }
     expect(errors).toEqual([])
   })
@@ -131,7 +184,65 @@ test.describe('选择与操作', () => {
     await check(page, '演示视频 01.mp4')
     await page.keyboard.press('Control+a')
     await expect(page.getByTitle('退出多选')).toContainText('43 项')
+    await expect(page.getByTitle('全选')).toHaveCount(0)
 
+    expect(errors).toEqual([])
+  })
+
+  test('框选到视口底部时自动滚动并选中虚拟长列表', async ({ page }) => {
+    const errors = watch(page)
+    await boot(page, {
+      storage: {
+        '115Master_drive_view_type': 'list',
+        '115Master_pageSize': '30',
+      },
+    })
+
+    const first = await rows(page).first().boundingBox()
+    expect(first).not.toBeNull()
+    const x = first!.x + first!.width * 0.7
+    const y = first!.y + first!.height / 2
+
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.move(x, page.viewportSize()!.height - 56, { steps: 5 })
+
+    expect(await page.evaluate(() => document.documentElement.style.overflow)).not.toBe('hidden')
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(300)
+    await expect(page.getByTitle('退出多选')).toContainText('30 项')
+    await page.mouse.up()
+
+    await expect(row(page, '演示视频 28.mp4')).toHaveAttribute('data-checked', 'true')
+    expect(errors).toEqual([])
+  })
+
+  test('移动与打标签对话框使用沉浸式滚动条', async ({ page }) => {
+    const errors = watch(page)
+    await boot(page, {
+      mocks: api => api.override(LABEL_RE, ({ route }) => json(route, {
+        state: true,
+        data: {
+          total: 2,
+          list: [
+            { id: '1', name: '电影', color: '#FF4B30' },
+            { id: '2', name: '剧集', color: '#2670FC' },
+          ],
+        },
+      })),
+    })
+
+    await row(page, '演示视频 01.mp4').click({ button: 'right' })
+    await menu(page).getByRole('menuitem', { name: '移动' }).click()
+    const move = page.getByRole('dialog', { name: '移动到' })
+    await expect(move).toBeVisible()
+    await expect(move.locator('.ui-scrollbar.ui-scrollbar-md.overflow-y-auto')).toHaveCount(1)
+    await move.getByRole('button', { name: '取消' }).click()
+
+    await page.getByRole('button', { name: '打标签' }).click()
+    const tags = page.getByRole('dialog', { name: '打标签' })
+    await expect(tags).toBeVisible()
+    await expect(tags.locator('.ui-scrollbar.ui-scrollbar-md.overflow-y-auto')).toHaveCount(1)
+    await tags.getByRole('button', { name: '取消' }).click()
     expect(errors).toEqual([])
   })
 

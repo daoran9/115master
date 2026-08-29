@@ -1,5 +1,5 @@
+import type { ImageLoader } from '@115master/ui'
 import type { GMImageCandidate } from './gm'
-import type { ImageLoader } from './types'
 import type { JavInfo } from '@/utils/jav/jav'
 import { javCache } from '@/utils/cache/javCache'
 import {

@@ -17,14 +17,14 @@
     "url": "https://github.com/daoran9/115master/issues"
   },
   "sideEffects": [
-    "./dist/styles.css"
+    "./dist/styles/index.css"
   ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./styles.css": "./dist/styles.css"
+    "./styles.css": "./dist/styles/index.css"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -40,8 +40,10 @@
     "dev:bundle": "vite build --watch --emptyOutDir=false",
     "dev:types": "vue-tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "type-check": "vue-tsc -p tsconfig.json --noEmit && vue-tsc -p tsconfig.stories.json --noEmit",
-    "test": "pnpm test:inertness && vitest run",
+    "test": "pnpm test:inertness && pnpm test:unit && pnpm test:storybook",
     "test:inertness": "node ../../scripts/storybook-explicit-tests.mjs inertness .storybook/inertness.json",
+    "test:unit": "vitest run --project=unit",
+    "test:storybook": "vitest run --project=storybook-light && vitest run --project=storybook-dark && vitest run --project=storybook-reduced-motion && vitest run --project=storybook-mobile",
     "test:watch": "vitest",
     "lint": "eslint . ../../scripts/storybook-explicit-tests.mjs",
     "lint:fix": "eslint --fix",
@@ -56,7 +58,8 @@
     "vue": "^3.5.13"
   },
   "dependencies": {
-    "@floating-ui/vue": "^1.1.10"
+    "@floating-ui/vue": "^1.1.10",
+    "@vueuse/core": "^14.1.0"
   },
   "devDependencies": {
     "@115master/eslint-config": "workspace:*",
@@ -71,6 +74,7 @@
     "@vitejs/plugin-vue-jsx": "^5.0.1",
     "@vitest/browser-playwright": "^4.1.10",
     "daisyui": "^5.6.16",
+    "jsdom": "^29.1.1",
     "playwright": "^1.57.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

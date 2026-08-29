@@ -44,13 +44,13 @@
     <HUD />
 
     <!-- 错误提示 -->
-    <LoadingError
+    <StatusFeedback
       v-if="playerCore?.loadError"
       :class="styles.error"
-      :message="playerCore.loadError"
-      :closable="true"
-      close-text="忽略错误"
-      @close="playerCore.loadError = undefined"
+      status="error"
+      v-bind="errorFeedback(playerCore.loadError)"
+      close-label="忽略错误"
+      :on-close="closeError"
     />
 
     <!-- 加载动画 -->
@@ -60,18 +60,27 @@
     <Statistics />
 
     <!-- 右键菜单 -->
-    <ContextMenu>
-      <template #aboutContent>
-        <slot name="aboutContent" />
-      </template>
-    </ContextMenu>
+    <ActionMenu
+      :open="contextMenu.visible.value"
+      :position="contextMenu.position.value"
+      :groups="contextMenu.groups"
+      material="overlay"
+      aria-label="播放器操作"
+      @update:open="(visible: boolean) => contextMenu.visible.value = visible"
+    />
+
+    <PlayerSettingsPopup
+      :visible="contextMenu.showSettings.value"
+      :default-tab="contextMenu.defaultSettingsTab.value"
+      @update:visible="(visible: boolean) => contextMenu.showSettings.value = visible"
+    />
 
     <!-- 恢复容器 -->
     <div
       v-if="source.isInterrupt.value"
       :class="styles.resumeContainer"
     >
-      <Button variant="glass-overlay" :class="styles.resumeButton" @click="source.resumeSource">
+      <Button variant="solid" :class="styles.resumeButton" @click="source.resumeSource">
         恢复播放
       </Button>
     </div>
@@ -81,11 +90,10 @@
 <script setup lang="ts">
 import type { PlayerContext } from './hooks/usePlayerProvide'
 import type { XPlayerEmit, XPlayerProps } from './types'
-import { Button } from '@115master/ui'
+import { ActionMenu, Button, StatusFeedback } from '@115master/ui'
 import { shallowRef, watch, watchEffect } from 'vue'
-import { LoadingError } from '@/components'
 import { clsx } from '@/utils/clsx'
-import ContextMenu from './components/ContextMenu/index.vue'
+import { errorFeedback } from '@/utils/errorFeedback'
 import ControlsBar from './components/Controls/ControlBar.vue'
 import ControlsHeader from './components/Controls/ControlHeader.vue'
 import ControlsMask from './components/Controls/ControlMask.vue'
@@ -94,6 +102,7 @@ import SubtitleInfo from './components/Controls/SubtitleInfo.vue'
 import HUD from './components/HUD/index.vue'
 import Loading from './components/Loading/index.vue'
 import PlayAnimation from './components/PlayAnimation/index.vue'
+import PlayerSettingsPopup from './components/Settings/PlayerSettingsPopup.vue'
 import { FAST_JUMP_OFFSET, HIGH_FAST_JUMP_OFFSET } from './components/Shortcuts/shortcuts.const'
 import Statistics from './components/Statistics/index.vue'
 import Subtitle from './components/Subtitle/index.vue'
@@ -122,8 +131,6 @@ defineSlots<{
   headerLeft: (props: { ctx: PlayerContext }) => void
   /** 头部右侧插槽 */
   headerRight: (props: { ctx: PlayerContext }) => void
-  /** 关于内容插槽 */
-  aboutContent: () => void
 }>()
 
 const styles = clsx({
@@ -167,7 +174,13 @@ const {
   videoEnhance,
   playerCore,
   controls,
+  contextMenu,
 } = ctx
+
+function closeError() {
+  if (playerCore.value)
+    playerCore.value.loadError = undefined
+}
 
 // 监听控制栏可见性，直接设置光标样式
 watch(

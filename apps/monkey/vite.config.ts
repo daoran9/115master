@@ -9,6 +9,7 @@ import { visualizer } from 'rollup-plugin-visualizer'
 import { defineConfig } from 'vite'
 import mkcert from 'vite-plugin-mkcert'
 import monkey, { cdn, util } from 'vite-plugin-monkey'
+import vueDevTools from 'vite-plugin-vue-devtools'
 import svgLoader from 'vite-svg-loader'
 import PKG from './package.json'
 import { devConfig } from './plugins/dev'
@@ -64,6 +65,10 @@ export default defineConfig({
       },
     }),
     mkcert(),
+    // userscript 没有 HTML 入口，在 MasterApp 重置文档后再注入开发面板
+    vueDevTools({
+      appendTo: 'src/app/devtools.ts',
+    }),
     vue(),
     vueJsx(),
     tailwindcss(),
@@ -106,6 +111,10 @@ export default defineConfig({
           'aps.115.com',
           'webapi.115.com',
           'proapi.115.com',
+          'passportapi.115.com',
+          'qrcodeapi.115.com',
+          'captchaapi.115.com',
+          'aq.115.com',
           'uplb.115.com',
           'cpats01.115.com',
           'dl.115cdn.net',

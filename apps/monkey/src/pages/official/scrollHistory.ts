@@ -2,6 +2,7 @@ import { throttle } from 'lodash'
 import { appLogger } from '@/utils/logger'
 
 const STORAGE_KEY = '115_master_official_scroll_history'
+const MAX_HISTORY_ENTRIES = 128
 
 /** 新版 115 文件页滚动位置记录。 */
 export class OfficialScrollHistory {
@@ -83,8 +84,14 @@ export class OfficialScrollHistory {
       return
     }
 
+    /** 删除后重写，使重复访问的目录成为最新记录。 */
     const history = this.readHistory()
+    delete history[this.activeKey]
     history[this.activeKey] = this.scrollBox.scrollTop
+
+    /** 会话内最多保留最近 128 个目录或列表位置。 */
+    for (const key of Object.keys(history).slice(0, -MAX_HISTORY_ENTRIES))
+      delete history[key]
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(history))
   }
 

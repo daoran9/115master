@@ -26,13 +26,7 @@
     >
       <!-- 错误状态 -->
       <div v-if="props.variant !== 'official' && extInfo.error.value" :class="styles.states.error">
-        <LoadingError
-          v-if="props.variant === 'legacy'"
-          :message="extInfo.error.value"
-        >
-          获取番号 [{{ props.avNumber }}] 失败
-        </LoadingError>
-        <LoadingError v-else :message="extInfo.error.value" size="mini" />
+        <StatusFeedback status="error" size="xs" :padded="false" v-bind="errorFeedback(extInfo.error.value)" />
       </div>
 
       <!-- 加载骨架 -->
@@ -70,9 +64,9 @@
       <!-- 内容 -->
       <template v-else-if="extInfo.state.value">
         <div
+          v-if="props.variant !== 'drive'"
           :class="[
             styles.cover.container,
-            props.variant === 'drive' && styles.cover.drive,
             isLegacyVisual && styles.cover.legacy,
           ]"
         >
@@ -230,15 +224,12 @@
 
 <script setup lang="ts">
 import type { JavInfo } from '@/utils/jav/jav'
+import { Empty, Image, StatusFeedback } from '@115master/ui'
 import { format } from '@115master/utils'
 import { useAsyncState } from '@vueuse/core'
 import { computed, onBeforeUnmount } from 'vue'
-import {
-  Empty,
-  Image,
-  LoadingError,
-} from '@/components'
 import { clsx } from '@/utils/clsx'
+import { errorFeedback } from '@/utils/errorFeedback'
 import { createFanzaCoverLoader } from '@/utils/imageLoader'
 import { createJavInfoSources } from '@/utils/jav'
 import { loadJavInfo } from '@/utils/jav/loadInfo'
@@ -278,7 +269,6 @@ const styles = clsx({
   // 封面样式
   cover: {
     container: 'flex h-24 w-36 items-center justify-center',
-    drive: 'hidden',
     legacy: '!h-[180px] !w-[267.65px] shrink-0 overflow-hidden rounded-xl [box-shadow:0_0_10px_1px_rgba(0,0,0,0.1)]',
     link: 'block h-full w-full',
   },
@@ -292,7 +282,7 @@ const styles = clsx({
   title: {
     container: 'text-md text-base-content/70 ml-2',
     legacy: '!ml-0 !text-[18px] !font-semibold !text-[#333]',
-    link: 'hover:text-primary line-clamp-1 transition-colors hover:underline',
+    link: 'hover:text-primary line-clamp-1 transition-colors ease-[var(--ui-ease-standard)] hover:underline',
   },
   // 内容样式
   content: {
@@ -309,7 +299,7 @@ const styles = clsx({
     label: 'text-base-content/70 h-5 w-8 shrink-0',
     value: 'text-base-content/70 flex flex-1 flex-wrap gap-2',
     compactValue: 'line-clamp-1',
-    link: 'hover:text-primary transition-colors hover:underline',
+    link: 'hover:text-primary transition-colors ease-[var(--ui-ease-standard)] hover:underline',
     badge: 'bg-base-200 hover:bg-base-200 rounded px-1 py-[1px] text-xs',
     legacy: '!gap-3',
     legacyLabel: '!h-auto !w-8 !shrink-0 !text-[#999]',

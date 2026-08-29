@@ -25,19 +25,19 @@ export async function boot(page: Page, options: BootOptions = {}) {
   await expect(row(page, '动漫').first()).toBeVisible()
 }
 
-/** 文件行（data-selection-key=pickcode，见 useFileList.itemProps） */
+/** 文件行（data-ui-collection-selection-key=统一文件/目录 ID，见 useFileList.itemProps） */
 export function rows(page: Page) {
-  return page.locator('[data-selection-key]')
+  return page.locator('[data-ui-collection-selection-key]')
 }
 
 /** 按名称定位文件行（FileItemContent 以 span[title] 承载文件名） */
 export function row(page: Page, name: string) {
-  return page.locator(`[data-selection-key]:has(span[title="${name}"])`)
+  return page.locator(`[data-ui-collection-selection-key]:has(span[title="${name}"])`)
 }
 
-/** 顶栏（Header.tsx 的 @container 外壳） */
+/** 顶栏（UI Header 的 @container 外壳） */
 export function header(page: Page) {
-  return page.locator('.header-sticky-effect')
+  return page.locator('[data-ui-header-content]')
 }
 
 /**

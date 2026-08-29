@@ -4,7 +4,6 @@ import { createServer } from 'node:http'
 import { extname, join, normalize, resolve, sep } from 'node:path'
 import process from 'node:process'
 
-/** 零依赖静态文件服务器：node server.mjs <rootDir> <port> */
 const types = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',

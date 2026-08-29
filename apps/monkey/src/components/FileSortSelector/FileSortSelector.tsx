@@ -1,8 +1,7 @@
 import type { Share } from '@115master/drive115'
 import type { PropType } from 'vue'
-import { Button, Tooltip } from '@115master/ui'
+import { Button, ResponsiveMenu, Tooltip } from '@115master/ui'
 import { computed, defineComponent } from 'vue'
-import { ResponsiveMenu } from '@/components'
 import { I, Icon } from '@/icons'
 import { SORT_OPTIONS } from './config'
 import SortOptions from './SortOptions'
@@ -62,11 +61,11 @@ const FileSortSelector = defineComponent({
           target: (_props: object) => (
             <Tooltip content={`当前排序：${sortLabel.value}${props.fc_mix === 0 ? '（目录置顶）' : ''}`}>
               <Button
+                {..._props}
                 variant="glass-floating"
                 shape="circle"
                 aria-label={`当前排序：${sortLabel.value}`}
                 tabindex="0"
-                {..._props}
               >
                 <span class="relative inline-flex items-center">
                   {

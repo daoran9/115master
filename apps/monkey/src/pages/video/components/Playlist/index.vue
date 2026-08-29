@@ -1,45 +1,45 @@
 <template>
   <div :class="styles.playlist.container">
-    <div :class="styles.box">
-      <div :class="styles.playlist.header.root">
-        <div :class="styles.playlist.header.title">
-          <Icon :name="I.PLAYLIST" class="size-10" />
-          播放列表
-          <span
-            v-if="playlist.state?.data?.length && playlist.state?.data?.length > 0"
-            :class="styles.playlist.header.count"
-          >({{ playlist.state?.data.length }})</span>
-        </div>
-        <Button
-          variant="ghost"
-          shape="circle"
-          :class="styles.playlist.header.close"
-          @click="emit('close')"
-        >
-          <Icon :name="I.CLOSE" :class="styles.playlist.header.closeIcon" />
-        </Button>
+    <div data-app-playlist-header :class="styles.playlist.header.root">
+      <div :class="styles.playlist.header.title">
+        <Icon :name="I.PLAYLIST" class="size-10" />
+        播放列表
+        <span
+          v-if="playlist.state?.data?.length && playlist.state?.data?.length > 0"
+          :class="styles.playlist.header.count"
+        >({{ playlist.state?.data.length }})</span>
       </div>
-
-      <div v-if="playlist.error" :class="styles.playlist.content">
-        <LoadingError :message="playlist.error" />
-      </div>
-      <div v-else-if="playlist.isLoading || (!playlist.isLoading && !playlist.isReady)" :class="styles.playlist.content">
-        <div class="skeleton h-24 w-full rounded-lg" />
-      </div>
-      <div
-        v-else
-        class="custom-scrollbar" :class="[styles.playlist.content]"
+      <Button
+        variant="ghost"
+        shape="circle"
+        aria-label="关闭播放列表"
+        title="关闭播放列表"
+        :class="styles.playlist.header.close"
+        @click="emit('close')"
       >
-        <PlaylistItem
-          v-for="item in playlist.state?.data"
-          ref="playlistItemRefs"
-          :key="item.pc"
-          :item="item"
-          :active="item.pc === pickCode"
-          @play="handlePlay"
-        />
-        <div :class="styles.playlist.divider" />
-      </div>
+        <Icon :name="I.CLOSE" :class="styles.playlist.header.closeIcon" />
+      </Button>
+    </div>
+
+    <div v-if="playlist.error" :class="styles.playlist.content">
+      <StatusFeedback status="error" v-bind="errorFeedback(playlist.error)" />
+    </div>
+    <div v-else-if="playlist.isLoading || (!playlist.isLoading && !playlist.isReady)" :class="styles.playlist.content">
+      <div class="skeleton h-24 w-full rounded-lg" />
+    </div>
+    <div
+      v-else
+      :class="[scrollbar(), styles.playlist.content]"
+    >
+      <PlaylistItem
+        v-for="item in playlist.state?.data"
+        ref="playlistItemRefs"
+        :key="item.pc"
+        :item="item"
+        :active="item.pc === pickCode"
+        @play="handlePlay"
+      />
+      <div :class="styles.playlist.divider" />
     </div>
   </div>
 </template>
@@ -48,11 +48,11 @@
 import type { Share } from '@115master/drive115'
 import type PlaylistItemVue from './item.vue'
 import type { useDataPlaylist } from '@/pages/video/data/useDataPlaylist'
-import { Button } from '@115master/ui'
+import { Button, scrollbar, StatusFeedback } from '@115master/ui'
 import { nextTick, useTemplateRef, watch } from 'vue'
-import { LoadingError } from '@/components'
 import { I, Icon } from '@/icons'
 import { clsx } from '@/utils/clsx'
+import { errorFeedback } from '@/utils/errorFeedback'
 import PlaylistItem from './item.vue'
 
 const props = defineProps<{
@@ -67,27 +67,19 @@ const emit = defineEmits<{
 
 /** 样式常量定义 */
 const styles = clsx({
-  box: [
-    '[--space:calc(var(--spacing)*2)]',
-    'relative',
-    'h-[calc(100%-var(--space)*2)] w-[calc(100%-var(--space)*2)]',
-    'mx-auto mt-[var(--space)]',
-    'rounded-2xl',
-    'overflow-hidden',
-    'ui-glass-panel',
-  ],
   playlist: {
     container: [
       'text-base-content relative box-border flex h-full flex-col',
       '[--app-playlist-space:calc(var(--spacing)*4)]',
-      '[--app-playlist-header-height:calc(var(--spacing)*16)]',
+      '[--app-playlist-header-height:calc(var(--spacing)*16+var(--app-playlist-handle-space,0rem))]',
     ],
     header: {
       root: [
         'ui-z-raised absolute inset-x-0 top-0',
         'flex flex-shrink-0 items-center justify-between',
         'h-(--app-playlist-header-height)',
-        'px-(--app-playlist-space) py-4',
+        'px-(--app-playlist-space) pb-4',
+        'pt-[calc(var(--spacing)*4+var(--app-playlist-handle-space,0rem))]',
         'text-base-content',
         'app-playlist-header-fade',
       ],
@@ -101,8 +93,7 @@ const styles = clsx({
       'h-[calc(100%-var(--app-playlist-header-height))]',
       'overflow-y-auto',
       'px-(--app-playlist-space) pt-[var(--app-playlist-header-height)]',
-      '[&::-webkit-scrollbar-track]:mt-(--app-playlist-header-height)',
-      '[&::-webkit-scrollbar-track]:mb-6',
+      '[--ui-scrollbar-track-inset-start:var(--app-playlist-header-height)]',
     ],
     divider: 'divider text-base-content/30 mx-auto w-1/3',
   },
@@ -152,6 +143,10 @@ watch(
 </script>
 
 <style>
+.app-playlist-drawer.ui-drawer--bottom {
+  --app-playlist-handle-space: var(--ui-drawer-handle-size);
+}
+
 .app-playlist-header-fade::before {
   position: absolute;
   inset: 0;

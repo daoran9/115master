@@ -17,8 +17,15 @@ export const routes: RouteRecordRaw[] = [
     name: 'drive',
     path: '/drive/:area?/:cid?',
     component: async () => import('../pages/drive/drive'),
-    meta: {
-      keepAlive: true,
+  },
+
+  {
+    name: 'login',
+    path: '/login',
+    component: () => import('../pages/login/LoginPage'),
+    beforeEnter: async (to) => {
+      const guest = await import('./guest')
+      return guest.guardLogin(to.query.redirect)
     },
   },
 

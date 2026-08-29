@@ -12,6 +12,10 @@ _Avoid_: Monkey 组件仓库、共享组件堆
 为视觉决策命名的语义值，是主题、组件与材质共享视觉语言的最小单位。
 _Avoid_: 魔法数、样式常量
 
+**Motion Token**：
+由 `--ui-ease-*` 公共 Token 承载的动效意图；standard 处理轻量状态变化，enter / exit 处理进入与退出，move 处理结构性几何变化，settle 处理快速抵达终点的反馈，snap 处理轻微越界回弹的吸附落位，linear 处理匀速过程。调用方按交互语义选择，不依赖数学曲线族、硬编码 timing function 或局部别名。
+_Avoid_: Sine / Quint / Expo 命名、裸 cubic-bezier、应用曲线表、Token 适配层
+
 **公共 Token**：
 供应用、组件与材质共同消费的稳定语义值；已有语义直接沿用 daisyUI，只为缺失概念扩展 UI 命名空间。
 _Avoid_: Token 别名、重复语义变量
@@ -25,7 +29,7 @@ _Avoid_: 公共变量、主题 Token
 _Avoid_: 预设 Token、完整 Token 表
 
 **层叠尺度**：
-由 `--ui-z-*` 公共 Token 与同名 `ui-z-*` 工具类承载的全局 z-index 语义序列，分组件内（under/raised/cover）、页面（elevated/dropdown/header/fab/scrim/sheet）、全局浮层（host/progress/menu/toast/tooltip/dnd/watermark）三段；progress 有意低于浮层，非交互 watermark 位于普通文档最高层，Dialog 走原生 top layer 不参与本尺度。
+由 `--ui-z-*` 公共 Token 与同名 `ui-z-*` 工具类承载的全局 z-index 语义序列，分组件内（under/raised/cover）、页面（elevated/dropdown/header/fab/scrim/sheet）、全局浮层（host/progress/menu/toast/tooltip/dnd/watermark）三段；progress 有意低于浮层，非交互 watermark 位于普通文档最高层，Modal Surface 走原生 top layer 不参与本尺度。
 _Avoid_: 裸数值 z-index、组件私自定义层级
 
 **Glass 材质**：
@@ -61,15 +65,27 @@ _Avoid_: 组件基础 Story、重复 Story
 _Avoid_: Popover、菜单、可点击提示
 
 **Context Menu**：
-由坐标与受控 open 状态驱动的临时操作表面；统一负责 Overlay Host、视口避让、滚动锁定、焦点循环与关闭语义，菜单项内容由应用通过 slot 提供。
+由坐标与受控 open 状态驱动的临时操作表面；统一负责 Overlay Host、视口避让、滚动锁定、焦点循环、关闭语义与材质选择，默认使用 floating，媒体场景可选择 overlay；标准数据驱动操作使用 Action Menu，自定义菜单项内容由应用通过 slot 提供。
 _Avoid_: 应用挂载节点、业务 Action 模型、页面内定位逻辑
+
+**Action Menu**：
+由应用无关的动作描述分组驱动、内部组合 Context Menu 的标准操作表面；统一负责菜单项语义、显隐、禁用态、语义色、前导内容、尾部提示、空组折叠、分隔线与选中关闭，调用方拥有业务动作和受控 open 状态。
+_Avoid_: Monkey IconValue、业务 Action 继承、页面专属菜单渲染
+
+**Headless DnD**：
+应用无关的 Pointer Events 拖拽模块；DndRoot 拥有会话与跟随层，DndSource 负责激活阈值、payload 惰性求值和 click 抑制，DndTarget 负责命中、接收判断与投放，DndMonitor 只公开会话是否活跃。调用方通过 slot 保留真实 DOM，并拥有 payload、预览内容和领域投放规则。
+_Avoid_: 文件拖拽适配、业务 payload 类型、应用挂载节点
+
+**Responsive Menu**：
+由锚点触发、按公共 sm 断点选择桌面浮动菜单或移动端 bottom Drawer 的临时操作表面；统一负责 Overlay Host、Modal Host、定位、焦点与关闭语义，标题和菜单项内容由应用提供。
+_Avoid_: App Dialog Adapter、应用挂载节点、业务 Action 模型
 
 **Overlay Host**：
 位于当前主题作用域内、供临时浮层脱离裁切上下文渲染的共享宿主。
 _Avoid_: `#my-app`、Tooltip 容器
 
 **公共 UI 契约**：
-由包根命名导出、允许消费方稳定依赖的组件、服务与类型集合；组件包括 Button、Pill、Tooltip、ContextMenu、Watermark、Dialog、DialogHost、NavigationStack 与 OverlayHost，服务固定为 createDialogService 与 useDialog，并公开与这些契约直接对应的 Props、选项、结果、关闭原因、服务实例和句柄类型。内部 Dialog 子组件、provide 方法、默认单例与内部文件路径不属于契约。
+由包根命名导出、允许消费方稳定依赖的组件、样式模块、交互模块、服务与类型集合；组件包括 ActionMenu、Button、Pill、FloatingDock、Image、Empty、Progress、Pagination、SelectionHeader、StatusFeedback、Tooltip、ContextMenu、ResponsiveMenu、DndRoot、DndSource、DndTarget、DndMonitor、Watermark、Header、HeaderStart、HeaderEnd、Dialog、Drawer、ModalHost、DialogHost、NavigationStack 与 OverlayHost，样式模块包括 Scrollbar，交互模块包括 useCollectionSelection，服务固定为 createDialogService 与 useDialog，并公开与这些契约直接对应的 Props、尺寸、文案集、加载器、选项、结果、关闭原因、服务实例和句柄类型。内部 Modal Root、DnD provide/use、默认单例与内部文件路径不属于契约。
 _Avoid_: 深层导入、默认导出
 
 **UI Namespace**：
@@ -92,21 +108,37 @@ _Avoid_: dark class、应用颜色表
 以最小的完整组件集合切换所有权；集合内实现、测试、stories 与消费入口一起迁移，不以减少改动文件数为目标。
 _Avoid_: 转发壳迁移、少改文件
 
-**Dialog 原语**：
-应用无关、由状态驱动的临时界面契约，负责模态交互、结构、可访问性与视觉呈现。
-_Avoid_: 弹窗服务、路由弹窗
+**Modal Surface**：
+应用无关、由状态驱动并暂时阻断外部交互的界面表面；Dialog 与 Drawer 是两种表面语义，共享关闭、焦点和生命周期契约。
+_Avoid_: 页面抽屉、浮层、Navigation Stack
+
+**Dialog**：
+带内容与操作结构的 Modal Surface，适合命令、确认、输入或聚焦任务；内容区的边界滚动被限制在当前 Dialog 内，不继续串联到模态外层。
+_Avoid_: Dialog 服务、Drawer、路由弹窗
+
+**Drawer**：
+从视口边缘进入且不预设业务结构的 Modal Surface，适合临时覆盖页面并承载调用方自己的完整内容。
+_Avoid_: 持久侧栏、页面 Sheet、Dialog
+
+**Modal Host**：
+单个 Vue 应用内所有 Modal Surface 的共享协调域；一个表面只属于一个 Host，一个 Host 对应一条 Modal Stack。
+_Avoid_: 全局 Modal 管理器、Dialog Host、Overlay Host
+
+**Modal Stack**：
+同一 Modal Host 内按实际打开顺序形成的表面集合；栈顶独占交互与蒙层，关闭时焦点沿打开链返回。
+_Avoid_: Navigation Stack、Dialog Service Stack、调用方层级
 
 **Navigation Stack**：
-应用无关、由状态驱动的临时导航栈；复用 Dialog 原语的模态生命周期与视觉外壳，移动端可呈现为全屏页面或内容高度的 Dialog 式 Sheet，桌面端呈现为居中 Dialog，并统一拥有标题栏、安全区、内容滚动、拖拽关闭、返回意图、关闭意图与方向感知转场。调用方通过页面标识与层级描述当前页面，并拥有导航状态、业务内容与本地化文案。
-_Avoid_: 设置面板、路由容器、Dialog 尺寸别名
+应用无关、由状态驱动且不拥有 Modal Surface 的内容导航栈；统一标题栏、安全区、内容滚动、返回与关闭意图和方向感知转场。调用方选择 Dialog 或 Drawer，并拥有页面标识、层级、导航状态、业务内容与本地化文案。
+_Avoid_: Modal Stack、设置面板、路由容器、模态外壳
 
 **Dialog 服务**：
-由 UI 基础包提供的应用无关命令式协调层，将配置对象形式的 alert、confirm、prompt 或自定义流程转换为 Dialog 原语状态。
-_Avoid_: Dialog 原语、路由弹窗服务
+由 UI 基础包提供的应用无关命令式协调层，将配置对象形式的 alert、confirm、prompt 或自定义流程转换为 Dialog 状态。
+_Avoid_: Dialog、Modal Host、路由弹窗服务
 
 **Dialog Host**：
-在单个 Vue 应用作用域内承载 Dialog 服务状态并渲染 Dialog 原语的宿主。
-_Avoid_: 全局 Dialog 单例、Dialog 容器
+在单个 Vue 应用作用域内承载 Dialog 服务状态并渲染服务条目的宿主；它参与 Modal Host，但不协调其他 Modal Surface。
+_Avoid_: Modal Host、全局 Dialog 单例、Dialog 容器
 
 **Dialog 服务实例**：
 由工厂为一个应用、Story 或测试创建的独立命令式 Dialog 状态与操作集合。
@@ -120,9 +152,9 @@ _Avoid_: UI Dialog 服务、router-aware Dialog
 应用在创建 Dialog 服务实例时提供的默认操作与提示文案，可由单次调用覆盖。
 _Avoid_: UI 内置中文、UI 内置英文
 
-**Dialog Stack**：
-同一服务实例内按打开顺序管理的 Dialog 集合；只有栈顶可交互，关闭栈顶后恢复下层上下文。
-_Avoid_: Dialog 队列、并行弹窗
+**Dialog Service Stack**：
+同一 Dialog 服务实例内按创建顺序管理的条目集合；它保留服务级 LIFO 操作，同时所有已渲染条目仍属于应用的 Modal Stack。
+_Avoid_: Modal Stack、Dialog 队列、并行弹窗
 
 **Dialog Outcome**：
 命令式 Dialog 结束时的正常结果；确认、提交或取消由返回值区分，取消不属于异常。
@@ -152,10 +184,50 @@ _Avoid_: 静默校验、通用表单引擎
 始终以原生按钮语义执行动作的控件；视觉可以呈现为 link 或 Glass，但不承担导航。
 _Avoid_: 链接按钮、router button
 
+**Progress**：
+固定在视口顶缘、由 active 状态驱动的页面级 indeterminate 加载反馈；只承担不占布局的视觉提示，调用方仍负责为内容区域声明 busy 语义。
+_Avoid_: 确定进度条、布局内进度、业务加载状态
+
+**Empty**：
+应用无关的居中空状态占位；展示调用方提供的字符串说明，支持标准尺寸、装饰图片、可隐藏的视觉区以及操作内容，图标通过 slot 注入。
+_Avoid_: 应用图标 registry、内置业务文案、集合状态管理、错误与加载反馈
+
+**Pagination**：
+应用无关的受控分页导航；统一响应式页码布局、跳页输入、每页数量选择与 Glass 承载语义，调用方拥有当前状态、总数、本地化文案和状态变更。
+_Avoid_: 数据请求、查询状态、内置业务文案、应用分页 store
+
+**StatusFeedback**：
+应用无关的居中语义状态反馈；展示调用方提供的字符串消息，支持 status、标准尺寸以及由 callback 与 label 成对配置的重试、关闭和详情操作，图标通过 slot 注入。
+_Avoid_: Error 对象格式化、播放器错误码解释、剪贴板或弹窗副作用、应用图标注册表、内置业务文案、应用状态管理
+
+**SelectionHeader**：
+应用无关的选择模式页面头部；展示调用方提供的选中数量与退出文案，在左侧按回调提供带淡入淡出过渡的全选操作，并由调用方通过 allSelected 控制其隐藏；图标通过 slots 注入，不管理选择状态。
+_Avoid_: 选择状态管理、应用图标 registry、内置本地化文案、业务操作集合
+
+**Collection Selection**：
+应用无关的集合选择交互模块；调用方通过一个 selection adapter 提供集合状态，并提供条目、稳定键、容器与默认激活行为。模块统一管理 Shift/Ctrl 多选、长按、框选、边缘自动滚动、右键选择与键盘快捷键，所有选择变更都写回同一个 adapter。
+_Avoid_: 文件或标签业务状态、复选框 DOM 查询、调用方手写选择手势、应用级框选样式
+
 **Pill**：
 呈现胶囊几何的信息、组合布局或导航容器；不执行按钮动作。
 _Avoid_: 胶囊按钮、Badge
 
+**FloatingDock**：
+由 `contentKey` 驱动显隐与内容身份的连续 Floating Glass 表面；统一负责表面进入退出、内容切换与 ResizeObserver 尺寸过渡，页面负责定位、对齐和背景羽化。
+_Avoid_: 页面底栏定位器、业务操作栏、Glass 交叉淡化
+
+**Header**：
+应用无关的吸附式页面头部外壳；随根滚动渐显衬底，并通过 HeaderStart 与 HeaderEnd 组合可收缩主内容和不收缩尾部操作。应用拥有业务内容，并可通过 `--ui-header-offset` 与 `--ui-header-gutter` 调整页面集成几何。
+_Avoid_: 业务导航栏、路由头部、应用间距变量
+
+**Image**：
+应用无关的图片状态容器；管理原生图片与注入式 loader 的加载、过期请求中止、资源释放、懒加载、骨架和错误回退。调用方拥有尺寸、替代文本、图片来源适配与自定义回退。
+_Avoid_: GM 请求、Referer、缓存与压缩策略、业务图片来源、图片预览器、应用图标 registry
+
 **Watermark**：
 在内容区域上方重复铺陈文本身份标记的装饰性组件；不拦截内容交互或进入无障碍树，只用于降低随意传播意愿，不构成数据保护边界。
 _Avoid_: 权限控制、数字版权管理、可交互遮罩
+
+**Scrollbar**：
+基于浏览器原生滚动行为的沉浸式滚动条样式模块；通过 `scrollbar(size)` 一次获得基础类与 `xs / sm / md / lg / xl` 尺寸类，可作用于单个滚动容器或整个子树；统一负责透明轨道、沿滚动轴的容器安全内缩、主题对比度与悬停／拖动状态，不改写原生滚动交互。默认轨道首尾各内缩 `1.5rem`，拥有悬浮头尾内容的容器可通过 `--ui-scrollbar-track-inset-start / end` 覆盖。
+_Avoid_: 业务包装容器、全局无选择器滚动条、自定义拖拽滚动实现

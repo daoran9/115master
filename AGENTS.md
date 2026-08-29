@@ -16,10 +16,10 @@ pnpm storybook            # 并行启动 UI Foundation (6006) 与 Monkey 集成 
 pnpm storybook:ui         # 仅启动 UI Foundation Storybook
 pnpm storybook:monkey     # 仅启动 Monkey 集成 Storybook
 pnpm build-storybook      # 构建两套静态 Storybook
+pnpm test:visual          # 视觉回归：Storybook × 双主题截图
+pnpm test:visual:update   # 更新当前平台视觉基线（写共享基线，须串行）
 pnpm test:e2e             # 业务 E2E：离线 harness (含 userscript 构建)
 pnpm test:e2e:run         # E2E 跳过构建 (纯跑全量；分片/过滤用法见下方说明)
-pnpm test:visual          # 视觉回归：storybook × 双主题截图 (需先 build-storybook)
-pnpm test:visual:update   # 更新视觉基线 (写共享基线，须串行)
 pnpm verify               # 总闸门：type-check && test && test:e2e && build-storybook && test:visual
 pnpm changeset            # 新建 changeset (仅用户执行)
 pnpm clean:cache          # 清理 Turbo / Vite / Rollup / TypeScript 构建缓存
@@ -123,4 +123,8 @@ Multi-context —— 根目录 `CONTEXT-MAP.md` 指向各 package/app 的 `CONTE
 
 ### Verification
 
-离线验证平台（单测/Storybook、业务 E2E、视觉回归）的命令、并行 agent 规约与扩展指南。详见 `docs/agents/verification.md`。
+离线验证平台（单测/Storybook、业务 E2E、静态 Storybook 构建）的命令、并行 agent 规约与扩展指南。详见 `docs/agents/verification.md`。
+
+### Component Stories
+
+组件 Story 的所有权、分类、Args/Controls、fixture、可访问性与显式 `.test()` 规范。详见 `docs/agents/component-stories.md`。

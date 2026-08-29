@@ -20,11 +20,7 @@
     >
       <!-- 错误状态 -->
       <div v-if="props.variant !== 'official' && videoCover.error" :class="styles.states.error">
-        <LoadingError
-          :size="props.variant === 'legacy' ? 'medium' : 'mini'"
-          :message="videoCover.error"
-          :style="props.variant === 'legacy' ? { margin: '0 auto' } : undefined"
-        />
+        <StatusFeedback status="error" size="xs" :padded="false" v-bind="errorFeedback(videoCover.error)" />
       </div>
 
       <!-- 骨架屏 -->
@@ -60,12 +56,13 @@
 </template>
 
 <script setup lang="ts">
+import { StatusFeedback } from '@115master/ui'
 import PhotoSwipe from 'photoswipe'
 import PhotoSwipeLightbox from 'photoswipe/lightbox'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { LoadingError } from '@/components'
 import { useSmartVideoCover } from '@/hooks/useVideoCover'
 import { clsx } from '@/utils/clsx'
+import { errorFeedback } from '@/utils/errorFeedback'
 import 'photoswipe/style.css'
 
 const props = withDefaults(defineProps<{
@@ -114,7 +111,7 @@ const styles = clsx({
     thumbItem: [
       'h-full',
       'cursor-zoom-in no-underline',
-      'transition-opacity hover:opacity-90',
+      'transition-opacity ease-[var(--ui-ease-standard)] hover:opacity-90',
     ],
     officialThumbItem: 'aspect-video overflow-hidden',
     legacyThumbItem: '!h-[150px] !w-auto',

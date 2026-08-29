@@ -1,7 +1,7 @@
 <template>
   <transition
-    enter-active-class="transition-all duration-200 ease-out"
-    leave-active-class="transition-all duration-200 ease-out"
+    enter-active-class="transition-all duration-200 ease-[var(--ui-ease-enter)]"
+    leave-active-class="transition-all duration-200 ease-[var(--ui-ease-exit)]"
     enter-from-class="opacity-0 translate-y-2"
     enter-to-class="opacity-100 translate-y-0"
     leave-from-class="opacity-100 translate-y-0"
@@ -39,7 +39,7 @@ const styles = clsx({
     'rounded-3xl',
     'text-base-content text-sm',
     'pointer-events-none',
-    'ui-glass-floating',
+    'ui-glass-panel',
   ],
   icon: 'size-8 opacity-80',
 })

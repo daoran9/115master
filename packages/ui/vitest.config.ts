@@ -48,8 +48,11 @@ export default mergeConfig(vite, defineConfig({
   optimizeDeps: {
     include: [
       '@storybook/addon-a11y',
+      '@storybook/addon-docs',
       '@storybook/addon-vitest',
       '@storybook/vue3-vite',
+      '@floating-ui/vue',
+      '@vueuse/core',
     ],
   },
   test: {

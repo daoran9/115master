@@ -1,10 +1,10 @@
 import type { PropType } from 'vue'
 import { Api } from '@115master/drive115'
-import { Button } from '@115master/ui'
+import { Button, Empty, scrollbar, StatusFeedback } from '@115master/ui'
 import { defineComponent } from 'vue'
-import { Empty, LoadingError } from '@/components'
 import { I, Icon } from '@/icons'
 import { useTagStore } from '@/store/tagList'
+import { errorFeedback } from '@/utils/errorFeedback'
 
 const { LabelColor } = Api.TagApi.Req
 
@@ -91,14 +91,14 @@ const TagPickerContent = defineComponent({
           )}
 
           {/* 列表区：加载 / 错误 / 空目录 / 无匹配 / 列表 */}
-          <div class="flex max-h-[45vh] flex-1 flex-col overflow-y-auto">
+          <div class={[...scrollbar(), 'flex max-h-[45vh] flex-1 flex-col overflow-y-auto']}>
             {store.error
               ? (
                   <div class="flex items-center justify-center py-10">
-                    <LoadingError
-                      message={store.error}
-                      retryable
-                      retryText="重试"
+                    <StatusFeedback
+                      status="error"
+                      {...errorFeedback(store.error)}
+                      retryLabel="重试"
                       onRetry={() => store.load()}
                     />
                   </div>
@@ -112,16 +112,21 @@ const TagPickerContent = defineComponent({
                 : store.tags.length === 0
                   ? (
                       <div class="py-6">
-                        <Empty icon={I.TAG} description="暂无标签，请先在标签管理页创建">
-                          <Button
-                            color="primary"
-                            size="sm"
-                            class="gap-1"
-                            onClick={() => props.onGotoTags()}
-                          >
-                            <Icon name={I.RIGHT} size="sm" />
-                            去创建标签
-                          </Button>
+                        <Empty description="暂无标签，请先在标签管理页创建">
+                          {{
+                            icon: () => <Icon name={I.TAG} size="custom" />,
+                            default: () => (
+                              <Button
+                                color="primary"
+                                size="sm"
+                                class="gap-1"
+                                onClick={() => props.onGotoTags()}
+                              >
+                                <Icon name={I.RIGHT} size="sm" />
+                                去创建标签
+                              </Button>
+                            ),
+                          }}
                         </Empty>
                       </div>
                     )
@@ -140,7 +145,7 @@ const TagPickerContent = defineComponent({
                               <li key={tag.id}>
                                 <label
                                   class={[
-                                    'flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 transition-colors',
+                                    'flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 transition-colors ease-[var(--ui-ease-standard)]',
                                     'hover:bg-base-content/5',
                                   ]}
                                 >

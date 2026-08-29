@@ -9,7 +9,6 @@ interface Entry {
   subtype?: string
 }
 
-/** 两套 storybook 均在 preview.ts 定义 theme global（light/dark） */
 const books = [
   {
     name: 'ui',
@@ -25,7 +24,6 @@ const books = [
   },
 ]
 
-/** 等待故事渲染、字体与图片就绪后短暂稳定 */
 async function ready(page: Page) {
   const root = page.locator('#storybook-root')
   await root.locator(':scope > *').first().waitFor({ state: 'visible' })
@@ -43,7 +41,6 @@ async function ready(page: Page) {
 
 for (const book of books) {
   const index = JSON.parse(readFileSync(join(book.root, 'index.json'), 'utf8')) as { entries: Record<string, Entry> }
-  /** 仅取真实故事：跳过 docs 与显式测试条目（subtype 'test'） */
   const stories = Object.keys(index.entries).filter(id => index.entries[id].type === 'story' && index.entries[id].subtype !== 'test')
 
   test.describe(book.name, () => {

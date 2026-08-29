@@ -1,12 +1,11 @@
 import type { Share } from '@115master/drive115'
+import type { ActionMenuGroup } from '@115master/ui'
 import type { Ref } from 'vue'
 import type { NavSource } from '@/hooks/useDriveNav/types'
-import type { Action } from '@/types/action'
-import { Button, Tooltip } from '@115master/ui'
+import { ActionMenu, Button, Pagination, scrollbar, Tooltip } from '@115master/ui'
 import { breakpointsTailwind, useBreakpoints, useStorage, watchDebounced } from '@vueuse/core'
 import { computed, defineComponent, nextTick, ref, shallowRef, watch } from 'vue'
 import {
-  FileContextMenu,
   FileItem,
   FileItemThumbnail,
   FileList,
@@ -16,13 +15,17 @@ import {
   FilePath,
   FileSortSelector,
   FileViewType,
-  Pagination,
 } from '@/components'
+import { PAGINATION_LABELS } from '@/constants'
 import { useDeleteAction } from '@/hooks/useDriveAction/useDeleteAction'
 import { useFileAction } from '@/hooks/useDriveAction/useFileAction'
+import { useDriveList } from '@/hooks/useDriveList'
 import { useStackNav } from '@/hooks/useDriveNav'
 import { I, Icon } from '@/icons'
-import { useDrivePageList } from './useDrivePageList'
+import { actionIcon } from '@/utils/action'
+import { getFilesItemId } from '@/utils/filesItem'
+
+type ThumbnailProps = InstanceType<typeof FileItemThumbnail>['$props']
 
 /** 文件浏览器内容组件 */
 const FileBroswer = defineComponent({
@@ -54,6 +57,7 @@ const FileBroswer = defineComponent({
     const keywordInput = ref(props.keyword?.value ?? '')
     const keyword = ref(props.keyword?.value ?? '')
     const scrollRef = ref<HTMLDivElement>()
+    const getScrollElement = () => scrollRef.value
     const viewType = useStorage<'list' | 'card'>('115Master_file_browser_view_type', 'list')
 
     /** 移动端搜索展开交互：默认仅搜索图标，点击后展开搜索框并 focus，同时隐藏操作按钮 */
@@ -64,22 +68,19 @@ const FileBroswer = defineComponent({
     const source = {
       cid: computed(() => keyword.value.trim() ? '0' : nav.cid.value),
       area: computed(() => keyword.value.trim() ? 'search' : nav.area.value),
-      direction: nav.direction,
     }
-    const explorer = useDrivePageList({
-      cid: source.cid,
-      area: source.area,
-      keyword,
-      fc: 1,
-      nf: ref('1'),
-      size: 20,
+    const page = shallowRef(1)
+    const size = shallowRef(20)
+    const explorer = useDriveList({
+      source: {
+        cid: source.cid,
+        area: source.area,
+        search: computed(() => !!keyword.value.trim()),
+      },
+      page,
+      size,
+      filter: { keyword, fc: 1, nf: '1' },
     })
-
-    // cid/area/keyword 变化 → 刷新
-    watch([source.cid, source.area, keyword], () => {
-      explorer.changePage(1)
-      explorer.refresh()
-    }, { immediate: true })
     const { newFolder, renameItem } = useFileAction()
     const { deleteBatch } = useDeleteAction()
     const contextmenuShow = shallowRef(false)
@@ -95,7 +96,7 @@ const FileBroswer = defineComponent({
 
     async function handleNewFolder() {
       if (await newFolder(nav.cid.value || '0'))
-        explorer.applyCreate()
+        await explorer.refresh()
     }
 
     async function handleRename() {
@@ -104,20 +105,20 @@ const FileBroswer = defineComponent({
       const item = contextmenuItem.value
       const newName = await renameItem(item)
       if (newName)
-        explorer.applyUpdate({ ...item, n: newName, ns: newName } as Share.Entity.FilesItem)
+        await explorer.refresh()
     }
 
     async function handleDelete() {
       if (!contextmenuItem.value)
         return
       if (await deleteBatch(nav.cid.value || '0', [contextmenuItem.value]))
-        explorer.applyRemove([contextmenuItem.value])
+        await explorer.refresh()
     }
 
-    const contextmenuActions = computed<Action[][]>(() => [
+    const contextmenuActions = computed<ActionMenuGroup[]>(() => [
       [
-        { name: 'rename', label: '重命名', icon: I.RENAME, onClick: handleRename },
-        { name: 'delete', label: '删除', icon: I.DELETE, onClick: handleDelete },
+        { id: 'rename', label: '重命名', leading: actionIcon(I.RENAME), onSelect: handleRename },
+        { id: 'delete', label: '删除', leading: actionIcon(I.DELETE), onSelect: handleDelete },
       ],
     ])
 
@@ -190,7 +191,7 @@ const FileBroswer = defineComponent({
 
     return () => (
       <div class="flex h-full flex-col">
-        <div class="ui-z-elevated sticky top-0 flex justify-end px-6 pt-3">
+        <div class="ui-z-header sticky top-0 flex justify-end px-6 pt-3">
           <div class="flex w-full items-center gap-2 sm:w-auto">
             {showSearchBox.value && (
               <label
@@ -257,12 +258,12 @@ const FileBroswer = defineComponent({
               <FileMenu class="ui-z-elevated relative shrink-0">
                 <FileNewFolderButton onClick={handleNewFolder}></FileNewFolderButton>
                 <FilePageSizeSelector
-                  currentPageSize={explorer.size.value}
+                  currentPageSize={size.value}
                   onChangePageSize={explorer.changeSize}
                 />
                 <FileSortSelector
                   asc={explorer.asc.value || 0}
-                  fc_mix={explorer.fc_mix.value || 0}
+                  fc_mix={explorer.fcMix.value || 0}
                   order={explorer.order.value || 'user_ptime'}
                   onSort={handleSort}
                 />
@@ -288,54 +289,72 @@ const FileBroswer = defineComponent({
           </div>
         </div>
 
-        <div ref={scrollRef} class="relative flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div
+          ref={scrollRef}
+          class={[...scrollbar(), 'relative flex min-h-0 flex-1 flex-col overflow-y-auto']}
+          data-file-browser-scroll
+        >
           <FileList
+            items={explorer.items.value}
+            getScrollElement={getScrollElement}
             viewType={viewType.value}
             class="
-              pt-1
+              shrink-0 pt-1
               data-[view-type=card]:gap-3!
               data-[view-type=card]:px-7
             "
             loading={explorer.loading.value}
+            refreshing={explorer.refreshing.value}
             error={explorer.error.value ?? null}
-            empty={!explorer.loading.value && (explorer.data.value?.data?.length ?? 0) === 0}
+            empty={!explorer.loading.value && explorer.items.value.length === 0}
           >
-            {(explorer.data.value?.data ?? []).map(item => (
-              <FileItem
-                class="data-[view-type=list]:px-6"
-                key={item.pc}
-                data={item}
-                pathSelect={true}
-                viewType={viewType.value}
-                cid={source.cid.value}
-                order={explorer.order.value}
-                asc={explorer.asc.value}
-                onClick={() => handleClickItem(item)}
-                onContextmenu={(e: MouseEvent) => handleContextmenu(item, e)}
-              >
-                {{
-                  thumbnail: (thumbnailProps: any) => (
-                    <FileItemThumbnail {...thumbnailProps} />
-                  ),
-                }}
-              </FileItem>
-            ))}
-            <FileContextMenu
-              actionConfig={contextmenuActions.value}
-              position={contextmenuPosition.value}
-              show={contextmenuShow.value}
-              onClose={() => contextmenuShow.value = false}
-            />
+            {{
+              item: ({ item, index }: { item: Share.Entity.FilesItem, index: number }) => (
+                <FileItem
+                  class="data-[view-type=list]:px-6"
+                  key={getFilesItemId(item)}
+                  data={item}
+                  index={index}
+                  setsize={explorer.items.value.length}
+                  pathSelect={true}
+                  viewType={viewType.value}
+                  cid={source.cid.value}
+                  order={explorer.order.value}
+                  asc={explorer.asc.value}
+                  onClick={() => handleClickItem(item)}
+                  onContextmenu={(e: MouseEvent) => handleContextmenu(item, e)}
+                >
+                  {{
+                    thumbnail: (thumbnailProps: ThumbnailProps) => (
+                      <FileItemThumbnail {...thumbnailProps} />
+                    ),
+                  }}
+                </FileItem>
+              ),
+              overlay: () => (
+                <ActionMenu
+                  aria-label="文件操作"
+                  groups={contextmenuActions.value}
+                  open={contextmenuShow.value}
+                  position={contextmenuPosition.value}
+                  onUpdate:open={open => contextmenuShow.value = open}
+                />
+              ),
+            }}
           </FileList>
 
           {explorer.pageCount.value > 1 && (
-            <div class="ui-z-elevated fixed bottom-4 left-1/2 flex -translate-x-1/2 justify-center">
+            <div
+              class="ui-z-elevated sticky bottom-0 flex shrink-0 justify-center px-4 py-4"
+              data-file-browser-pagination
+            >
               <Pagination
                 surface="floating"
-                currentPage={explorer.page.value}
-                currentPageSize={explorer.size.value}
+                currentPage={page.value}
+                currentPageSize={size.value}
                 showSizeChanger={false}
                 total={explorer.total.value}
+                labels={PAGINATION_LABELS}
                 onCurrentPageChange={explorer.changePage}
                 onPageSizeChange={explorer.changeSize}
               />

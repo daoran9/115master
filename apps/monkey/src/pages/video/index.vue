@@ -15,10 +15,10 @@
       ]"
     >
       <div
+        data-app-video-player
         data-video-player-shell
         :class="[
           styles.player.container,
-          preferences.showPlaylist && styles.player.containerFold,
           preferences.theatre && styles.player.containerTheatre,
         ]"
       >
@@ -111,6 +111,8 @@
                 <Button
                   variant="ghost"
                   shape="circle"
+                  aria-label="播放列表"
+                  data-app-playlist-trigger
                   :title="getActionNameTip(ctx, '播放列表', 'toggleShowSider')"
                   @click="togglePlaylist"
                 >
@@ -122,9 +124,6 @@
               </PlayerControlSurface>
             </div>
           </template>
-          <template #aboutContent>
-            <About />
-          </template>
         </XPlayer>
       </div>
     </div>
@@ -135,26 +134,22 @@
       <MovieInfo :movie-infos="DataMovieInfo" />
     </div>
 
-    <!-- Overlay 遮罩 -->
-    <div
-      :data-visible="preferences.showPlaylist"
-      :class="styles.sidebar.overlay"
-      @click="handleClosePlaylist"
-    />
-
-    <!-- Playlist 侧边栏 -->
-    <div
-      :data-visible="preferences.showPlaylist"
-      :class="styles.sidebar.content"
+    <Drawer
+      v-model:open="preferences.showPlaylist"
+      label="播放列表"
+      :placement="placement"
+      size="md"
+      overlay-handle
+      class="app-playlist-drawer"
+      data-app-xplayer-shortcuts
     >
       <Playlist
         :pick-code="params.pickCode.value"
         :playlist="DataPlaylist"
-        :visible="preferences.showPlaylist"
         @play="handleChangeVideo"
         @close="handleClosePlaylist"
       />
-    </div>
+    </Drawer>
   </div>
 </template>
 
@@ -170,9 +165,9 @@ import type {
 import type { PlayerContext } from '@/components/XPlayer/hooks/usePlayerProvide'
 import type XPlayerInstance from '@/components/XPlayer/index.vue'
 import type { Subtitle, ThumbnailRequest } from '@/components/XPlayer/types'
-import { Button } from '@115master/ui'
+import { Button, Drawer } from '@115master/ui'
 import { format } from '@115master/utils'
-import { useEventListener, useTitle } from '@vueuse/core'
+import { breakpointsTailwind, useBreakpoints, useTitle } from '@vueuse/core'
 import { cloneDeep } from 'lodash'
 import { computed, h, nextTick, onMounted, ref, shallowRef, toValue, watch } from 'vue'
 import iinaIcon from '@/assets/icons/iina-icon.png'
@@ -184,7 +179,6 @@ import { formatTime } from '@/components/XPlayer/utils/time'
 import { useMoveAction } from '@/hooks/useDriveAction/useMoveAction'
 import { useLockFn } from '@/hooks/useLockFn'
 import { I, Icon } from '@/icons'
-import { useDriveStore } from '@/store/driveList'
 import { subtitlePreference } from '@/utils/cache/subtitlePreference'
 import { clsx } from '@/utils/clsx'
 import { drive115 } from '@/utils/drive115Instance'
@@ -194,7 +188,6 @@ import { isMac, isWindows } from '@/utils/platform'
 import { goToPlayer } from '@/utils/route'
 import { useUserSetting } from '@/utils/userSettings'
 import { webLinkIINA, webLinkWindowsMpv } from '@/utils/weblink'
-import About from './components/About/index.vue'
 import { FileActionMenu } from './components/FileActionMenu'
 import HeaderInfo from './components/HeaderInfo/index.vue'
 import MovieInfo from './components/MovieInfo/index.vue'
@@ -217,10 +210,6 @@ const styles = clsx({
       'flex flex-col items-center',
       'min-h-screen gap-5',
       'bg-base-100 text-base-content',
-      'sm:[--app-xplayer-ratio:0.3] md:[--app-xplayer-ratio:0.518] lg:[--app-xplayer-ratio:0.618] 2xl:[--app-xplayer-ratio:0.718]',
-      '[--app-playlist-ratio:calc(1-var(--app-xplayer-ratio))]',
-      '[--app-xplayer-width:calc(100%*var(--app-xplayer-ratio))]',
-      '[--app-playlist-width:calc(100%*var(--app-playlist-ratio))]',
       'relative',
     ],
     mainTheatre: 'w-full bg-black',
@@ -238,31 +227,8 @@ const styles = clsx({
       'transform-gpu items-center justify-center overflow-hidden rounded-lg',
       'transition-all duration-200 ease-[var(--app-ease-in-out-cubic)] will-change-contents',
     ],
-    containerFold: [
-      'w-(--app-xplayer-width)!',
-    ],
     containerTheatre: '[aspect-ratio:auto] h-screen max-w-none rounded-none',
     video: 'absolute m-auto h-full w-full overflow-hidden',
-  },
-  // 侧边栏样式
-  sidebar: {
-    overlay: [
-      'ui-z-scrim fixed inset-0',
-      'bg-black/40',
-      'cursor-pointer',
-      'transition-opacity duration-300 ease-[var(--app-ease-in-out-sine)]',
-      'pointer-events-none opacity-0',
-      'data-[visible=true]:opacity-100',
-      'data-[visible=true]:pointer-events-auto',
-    ],
-    content: [
-      'ui-z-sheet fixed inset-y-0 right-0',
-      'w-(--app-playlist-width)',
-      'h-screen',
-      'transition-transform duration-300 ease-[var(--app-ease-out-cubic)]',
-      'translate-x-full',
-      'data-[visible=true]:translate-x-0',
-    ],
   },
   // 控制样式
   controls: {
@@ -270,6 +236,10 @@ const styles = clsx({
     iinaIcon: 'size-7 contrast-200 grayscale invert',
   },
 })
+
+/** 播放列表位置 */
+const sm = useBreakpoints(breakpointsTailwind).greaterOrEqual('sm')
+const placement = computed(() => sm.value ? 'end' : 'bottom')
 
 /** 日志 */
 const logger = appLogger.sub('Video')
@@ -299,8 +269,6 @@ const DataHistory = useDataHistory()
 const DataMark = useMark(DataFileInfo)
 /** 移动操作 */
 const moveAction = useMoveAction()
-/** drive 列表 store（移动后最小化刷新缓存用） */
-const driveStore = useDriveStore()
 
 /** 同步影片详情数据。 */
 function syncMovieInfo(
@@ -393,30 +361,15 @@ const FileActions = computed<FileActionMenuTypes.FileAction[]>(() => [
         parentId: DataFileInfo.state.parent_id,
       })
 
-      /** 当前文件项（移动 API 与列表缓存增量操作用） */
+      /** 当前文件项（移动 API 使用） */
       const fileItem = { fc: 1, fid: DataFileInfo.state.file_id } as Share.Entity.FilesItem
       /** 源目录（移动后 DataFileInfo 会刷新，需提前捕获） */
       const sourceCid = params.cid.value || DataFileInfo.state.parent_id || '0'
 
       /** 复用 masterapp 的移动功能（文件浏览器对话框 + 移动 API） */
-      const { success, pid } = await moveAction.moveBatch(sourceCid, [fileItem])
+      const { success } = await moveAction.moveBatch(sourceCid, [fileItem])
       if (!success) {
         return
-      }
-
-      /**
-       * 最小化刷新 drive 列表：
-       * 离开 drive 页后 nav 冻结在进入时的目录，与源目录一致则增量移除缓存页中的该项（目标目录失效）；
-       * 不一致（如直接打开播放页）则失效源/目标目录缓存，返回列表时重拉
-       */
-      if (driveStore.nav.cid === sourceCid) {
-        driveStore.applyRemoveMutation([fileItem], pid)
-      }
-      else {
-        driveStore.invalidate('all', sourceCid)
-        driveStore.invalidate('star', sourceCid)
-        driveStore.invalidate('all', pid)
-        driveStore.invalidate('star', pid)
       }
 
       /** 刷新文件信息，获取新的 parent_id */
@@ -593,16 +546,6 @@ function handleSeek(ctx: PlayerContext) {
 function handleClosePlaylist() {
   preferences.value.showPlaylist = false
 }
-
-/**
- * Esc 关闭播放列表：冒泡阶段监听，
- * XPlayer 弹窗（Popup）在 capture 阶段拦截 Esc 并阻止传播，优先级更高。
- */
-useEventListener(window, 'keydown', (event: KeyboardEvent) => {
-  if (event.key !== 'Escape' || !preferences.value.showPlaylist)
-    return
-  handleClosePlaylist()
-})
 
 /** 切换播放列表 */
 function togglePlaylist() {

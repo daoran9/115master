@@ -17,9 +17,10 @@
       </div>
 
       <template v-if="movieInfo.error.value">
-        <LoadingError
+        <StatusFeedback
           :class="styles.states.error"
-          :message="movieInfo.error.value"
+          status="error"
+          v-bind="errorFeedback(movieInfo.error.value)"
         />
       </template>
 
@@ -236,6 +237,7 @@
 
 <script lang="ts" setup>
 import type { useDataMovieInfo } from '@/pages/video/data/useDataMovieInfo'
+import { Empty, Image, StatusFeedback } from '@115master/ui'
 import { format } from '@115master/utils'
 import PhotoSwipe from 'photoswipe'
 import PhotoSwipeLightbox from 'photoswipe/lightbox'
@@ -246,12 +248,8 @@ import {
   ref,
   watch,
 } from 'vue'
-import {
-  Empty,
-  LoadingError,
-} from '@/components'
-import { Image } from '@/components/Image'
 import { clsx } from '@/utils/clsx'
+import { errorFeedback } from '@/utils/errorFeedback'
 import { createFanzaPreviewLoader, createGMImageFallbackLoader } from '@/utils/imageLoader'
 import { appLogger } from '@/utils/logger'
 import { hasActorFace, normalizeActorName } from '../../data/actorFaces'

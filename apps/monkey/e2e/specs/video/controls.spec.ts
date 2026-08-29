@@ -127,9 +127,9 @@ test.describe('控制栏', () => {
     await setupVideo(page)
     await page.goto(videoUrl(EPISODES[0].pc))
 
-    // 右键播放器遮罩 → 上下文菜单 → 偏好设置（弹层常驻 DOM，取可见的）
+    // 右键播放器遮罩 → 上下文菜单 → 偏好设置
     await page.mouse.click(720, 450, { button: 'right' })
-    const menu = page.locator('.x-popup:visible')
+    const menu = page.getByRole('menu', { name: '播放器操作' })
     await menu.getByText('偏好设置', { exact: true }).click()
 
     /** 设置弹窗：播放/快捷键两个标签页 */
@@ -137,6 +137,7 @@ test.describe('控制栏', () => {
       has: page.getByRole('heading', { name: '偏好设置' }),
     })
     await expect(settings).toBeVisible()
+    await expect(settings).toHaveClass(/\bui-scrollbar-md\b/)
     await expect(settings.getByRole('tab', { name: '播放' })).toBeVisible()
     await settings.getByRole('tab', { name: '快捷键' }).click()
     await expect(settings.getByText('播放/暂停', { exact: true })).toBeVisible()
@@ -154,16 +155,54 @@ test.describe('控制栏', () => {
     expect(errors).toEqual([])
   })
 
+  test('播放器信息复用 Dialog 并使用沉浸式滚动条', async ({ page }) => {
+    const errors = watch(page)
+    await setupVideo(page)
+    await page.goto(videoUrl(EPISODES[0].pc))
+
+    await page.mouse.click(720, 450, { button: 'right' })
+    const menu = page.getByRole('menu', { name: '播放器操作' })
+    await expect(menu.getByText('关于', { exact: true })).toHaveCount(0)
+    await menu.getByText('Statistics', { exact: true }).click()
+    const statistics = page.getByRole('dialog', { name: 'Statistics' })
+    await expect(statistics).toBeVisible()
+    await expect(statistics).toHaveAttribute('data-ui-dialog-size', 'lg')
+    await expect(statistics.locator('.ui-dialog__content.ui-scrollbar.ui-scrollbar-md')).toHaveCount(1)
+    const section = statistics.getByRole('heading', { name: 'Source Info' })
+    await expect(section).not.toHaveClass(/\bsticky\b/)
+    await expect(section).toHaveCSS('padding-left', '0px')
+    await statistics.getByRole('button', { name: '关闭' }).click()
+    await expect(statistics).toBeHidden()
+    expect(errors).toEqual([])
+  })
+
   test('快捷键 \\ 切换播放列表侧边栏', async ({ page }) => {
     const errors = watch(page)
     await setupVideo(page)
     await page.goto(videoUrl(EPISODES[0].pc))
 
-    await expect(sider(page)).toHaveAttribute('data-visible', 'false')
+    await expect(sider(page)).not.toHaveAttribute('open')
     await page.keyboard.press('Backslash')
-    await expect(sider(page)).toHaveAttribute('data-visible', 'true')
+    await expect(sider(page)).toHaveAttribute('open', '')
     await page.keyboard.press('Backslash')
-    await expect(sider(page)).toHaveAttribute('data-visible', 'false')
+    await expect(sider(page)).not.toHaveAttribute('open')
+    expect(errors).toEqual([])
+  })
+
+  test('全屏期间关闭播放列表，并在退出全屏后恢复', async ({ page }) => {
+    const errors = watch(page)
+    await setupVideo(page)
+    await page.goto(videoUrl(EPISODES[0].pc))
+
+    await page.locator('[data-app-playlist-trigger]').click()
+    await expect(sider(page)).toHaveAttribute('open', '')
+    await page.keyboard.press('f')
+    await page.waitForFunction(() => !!document.fullscreenElement)
+    await expect(sider(page)).not.toHaveAttribute('open')
+
+    await page.keyboard.press('f')
+    await page.waitForFunction(() => !document.fullscreenElement)
+    await expect(sider(page)).toHaveAttribute('open', '')
     expect(errors).toEqual([])
   })
 })
