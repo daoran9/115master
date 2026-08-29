@@ -367,7 +367,7 @@ test.describe('新版 115 原生文件列表适配', () => {
       '__115masterOfficialFileCapture__' in window.fetch,
     )).toBe(true)
     expect(await page.locator('html').getAttribute('data-115master-official-file-list'))
-      .toBe('2.0.0-beta.85')
+      .toBe('2.0.0-beta.100')
 
     /**
      * ================================================================================
@@ -746,6 +746,7 @@ test.describe('新版 115 原生文件列表适配', () => {
     const controls = page.locator('[data-115master-controls]')
     const toolbar = page.locator('[data-native-toolbar]')
     const nativeNewAction = page.locator('[data-native-new-action]')
+    const launcher = controls.locator('[data-115master-launcher-link]')
     const nativeNew = page.locator('[data-native-new]')
     const soraRow = page.locator('.file-list-item[data-file-id="official-file-1"]')
     const soraNative = soraRow.locator(':scope > .file-list-item > .flex.items-center')
@@ -757,6 +758,9 @@ test.describe('新版 115 原生文件列表适配', () => {
     await expect(controls).toHaveAttribute('data-placement', 'toolbar')
     await expect(controls.locator('xpath=..')).toHaveAttribute('data-native-toolbar', '')
     await expect(controls.locator('xpath=preceding-sibling::*[1]')).toHaveAttribute('data-native-new-action', '')
+    await expect(launcher).toBeVisible()
+    await expect(toggle.locator('xpath=following-sibling::*[1]'))
+      .toHaveAttribute('data-115master-launcher-link', '')
     await expect(toggle.locator('svg')).toBeVisible()
     await expect(toggle).toHaveAttribute('aria-pressed', 'true')
     await expect(toggle).toHaveAttribute('title', '关闭视频预览')
@@ -799,6 +803,61 @@ test.describe('新版 115 原生文件列表适配', () => {
     await expect(toggle).toHaveAttribute('aria-pressed', 'true')
     await expect(page.locator('[data-115master-preview]')).toHaveCount(3)
     expect(await soraNative.evaluate(row => row.getBoundingClientRect().height)).toBe(nativeHeight)
+    expect(errors).toEqual([])
+  })
+
+  test('新版选择文件时顶部操作栏覆盖 Fusion 工具组', async ({ page }) => {
+    const errors = watch(page)
+    await setupStorageHarness(page)
+    await page.goto(OFFICIAL_STORAGE_URL)
+
+    /**
+     * ================================================================================
+     * 步骤1：验证新版选择态工具栏覆盖
+     * ================================================================================
+     * 目标：选择文件后，Fusion 保留在顶部原位，由 115 原生批量操作栏覆盖。
+     * 数据源：新版“新建”工具项、Fusion 宿主和模拟的选择操作栏。
+     * 操作：
+     * 1) 隐藏“新建”并显示选择操作栏
+     * 2) 核对 Fusion 不回退到右下角且中心点由选择栏命中
+     */
+    const controls = page.locator('[data-115master-controls]')
+    const toolbar = page.locator('[data-native-toolbar]')
+    const nativeNewAction = page.locator('[data-native-new-action]')
+
+    await expect(controls).toHaveAttribute('data-placement', 'toolbar')
+    await toolbar.evaluate((node) => {
+      const toolbar = node as HTMLElement
+      toolbar.style.position = 'relative'
+      const selection = document.createElement('div')
+      selection.setAttribute('data-native-selection-toolbar', '')
+      selection.textContent = '下载 移动 删除 取消'
+      selection.style.cssText = [
+        'position:absolute',
+        'z-index:2',
+        'inset:0',
+        'display:flex',
+        'align-items:center',
+        'padding:0 10px',
+        'box-sizing:border-box',
+        'background:#fff',
+      ].join(';')
+      toolbar.append(selection)
+    })
+    await nativeNewAction.evaluate((node) => {
+      ;(node as HTMLElement).style.display = 'none'
+    })
+
+    await expect.poll(() => controls.getAttribute('data-placement')).toBe('toolbar')
+    await expect.poll(() => controls.evaluate((host) => {
+      const rect = host.getBoundingClientRect()
+      const top = host.ownerDocument.elementFromPoint(
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2,
+      )
+      return Boolean(top?.closest('[data-native-selection-toolbar]'))
+    })).toBe(true)
+    await expect(controls).toHaveJSProperty('isConnected', true)
     expect(errors).toEqual([])
   })
 

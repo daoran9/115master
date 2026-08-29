@@ -22,6 +22,8 @@ class OfficialPage {
   private scheduledFrame: number | null = null
   private toolbarRetryAttempts = 0
   private toolbarRetryId: number | null = null
+  private readonly frameLoadDisposers = new Map<HTMLIFrameElement, () => void>()
+  private toolbarMount: HTMLElement | null = null
 
   constructor() {
     this.init()
@@ -49,12 +51,15 @@ class OfficialPage {
       window.clearTimeout(this.toolbarRetryId)
     this.toolbarRetryId = null
     this.toolbarRetryAttempts = 0
+    this.frameLoadDisposers.forEach(dispose => dispose())
+    this.frameLoadDisposers.clear()
     this.previewDisposer?.()
     this.previewDisposer = null
     this.fileListMod?.destroy()
     this.fileListMod = null
     this.host?.remove()
     this.host = null
+    this.toolbarMount = null
     this.previewButton = null
     this.previewIcon = null
 
@@ -63,7 +68,7 @@ class OfficialPage {
 
   /** 初始化页面入口。 */
   private init(): void {
-    /*
+    /**
      * ================================================================================
      * 步骤1：校验挂载环境
      * ================================================================================
@@ -92,7 +97,7 @@ class OfficialPage {
      * ================================================================================
      * 步骤2：创建隔离工具组
      * ================================================================================
-     * 目标：用一个清晰、可靠的工具组承载预览开关和 MASTER 入口。
+     * 目标：新版页面承载预览开关和 Fusion 入口，旧版页面继续使用原版入口。
      * 数据源：本地 Ionicons 图标与 USER_SETTINGS。
      * 操作：
      * 1) 创建带离线图标的预览按钮和 Fusion 入口
@@ -111,13 +116,14 @@ class OfficialPage {
     const style = document.createElement('style')
     style.textContent = `
       :host {
-        z-index: 2147483646;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         letter-spacing: 0;
       }
 
       :host([data-placement="toolbar"]) {
         display: inline-flex;
+        position: relative;
+        z-index: auto;
         flex: 0 0 auto;
         align-items: center;
         vertical-align: middle;
@@ -125,6 +131,7 @@ class OfficialPage {
 
       :host([data-placement="floating"]) {
         position: fixed;
+        z-index: 2147483646;
         right: max(16px, env(safe-area-inset-right));
         bottom: max(16px, env(safe-area-inset-bottom));
       }
@@ -263,7 +270,7 @@ class OfficialPage {
      * ================================================================================
      * 步骤3：守护工具组位置
      * ================================================================================
-     * 目标：优先跟随“新建”按钮，并在新版页面重绘后自动恢复。
+     * 目标：优先跟随旧版预览或新版工具栏，并在页面重绘后自动恢复。
      * 操作：
      * 1) 按动画帧合并 DOM 变化
      * 2) 找不到工具栏时使用右下角兜底位置
@@ -389,16 +396,209 @@ class OfficialPage {
     this.logger.info('新版页面标题同步完成', title)
   }
 
+  /** 列出顶层页面及其可访问的同源 iframe 文档。 */
+  private getAccessibleDocuments(): Document[] {
+    /*
+     * ================================================================================
+     * 步骤1：收集可挂载工具栏的同源文档
+     * ================================================================================
+     * 目标：让顶层兼容入口能进入旧版 115 的同源文件列表 iframe。
+     * 数据源：当前 document 和逐层可访问的 iframe.contentDocument。
+     * 操作：
+     * 1) 从顶层文档开始广度遍历
+     * 2) 忽略跨域、未加载和重复文档
+     */
+    this.logger.info('开始收集可挂载工具栏的同源文档')
+
+    const documents: Document[] = []
+    const pending = [document]
+    const visited = new Set<Document>()
+
+    /** 1.1 逐层读取同源 iframe，跨域访问失败不影响其他文档。 */
+    while (pending.length > 0) {
+      const current = pending.shift()
+      if (!current || visited.has(current))
+        continue
+      visited.add(current)
+      documents.push(current)
+
+      current.querySelectorAll('iframe').forEach((frame) => {
+        this.watchFrameLoad(frame)
+        try {
+          if (frame.contentDocument)
+            pending.push(frame.contentDocument)
+        }
+        catch {
+          // 跨域 iframe 不属于 115 工具栏挂载范围。
+        }
+      })
+    }
+
+    this.logger.info('可挂载工具栏的同源文档收集完成', documents.length)
+    return documents
+  }
+
+  /** 监听同源 iframe 完成加载后重新解析工具栏。 */
+  private watchFrameLoad(frame: HTMLIFrameElement): void {
+    /*
+     * ================================================================================
+     * 步骤1：监听 iframe 工具栏就绪
+     * ================================================================================
+     * 目标：旧版文件页晚于顶层兼容入口加载时立即重试挂载。
+     * 数据源：当前页面发现的 iframe load 事件。
+     * 操作：
+     * 1) 每个 iframe 只注册一次监听
+     * 2) 加载完成后合并到下一动画帧重新挂载
+     */
+    if (this.frameLoadDisposers.has(frame))
+      return
+
+    this.logger.info('开始监听同源 iframe 工具栏就绪')
+
+    /** 1.1 监听由 destroy 统一移除，避免页面适配销毁后继续回调。 */
+    const handleLoad = () => this.scheduleAttach()
+    frame.addEventListener('load', handleLoad)
+    this.frameLoadDisposers.set(
+      frame,
+      () => frame.removeEventListener('load', handleLoad),
+    )
+
+    this.logger.info('同源 iframe 工具栏就绪监听完成')
+  }
+
+  /** 查找旧版页面当前可见的预览开关。 */
+  private findLegacyPreviewAnchor(): HTMLElement | null {
+    /*
+     * ================================================================================
+     * 步骤1：定位旧版预览开关
+     * ================================================================================
+     * 目标：把 Fusion 放到截图所示的预览按钮右侧。
+     * 数据源：顶层页面和同源 iframe 内的 .master-preview-switch-btn。
+     * 操作：
+     * 1) 读取每个可访问文档的预览按钮
+     * 2) 返回首个具备可见尺寸的节点
+     */
+    this.logger.info('开始定位旧版页面预览开关')
+
+    /** 1.1 旧版文件页开关由 TopHeaderMod 创建，类名属于稳定插件契约。 */
+    const anchor = this.getAccessibleDocuments()
+      .flatMap(current => Array.from(
+        current.querySelectorAll<HTMLElement>('.master-preview-switch-btn'),
+      ))
+      .find((node) => {
+        const rect = node.getBoundingClientRect()
+        return rect.width > 0 && rect.height > 0
+      }) ?? null
+
+    this.logger.info('旧版页面预览开关定位完成', Boolean(anchor))
+    return anchor
+  }
+
+  /** 查找旧版搜索页顶栏锚点，避免误挂到左侧纵向导航。 */
+  private findLegacyToolbarAnchor(): HTMLElement | null {
+    /*
+     * ================================================================================
+     * 步骤1：定位旧版搜索页顶栏锚点
+     * ================================================================================
+     * 目标：搜索模式没有预览开关时，仍把 Fusion 放在旧版顶栏，而不是左侧“新建”菜单。
+     * 数据源：旧版顶栏 .panel-nav 内的 115Master 入口和顶栏容器。
+     * 操作：
+     * 1) 优先使用 .master-drive-link 后的同排位置
+     * 2) 入口尚未注入时使用 .panel-nav 容器作为同排回退
+     */
+    this.logger.info('开始定位旧版搜索页顶栏锚点')
+
+    /** 1.1 NavMod 已注入入口时，直接紧跟 115Master。 */
+    for (const current of this.getAccessibleDocuments()) {
+      const masterLink = Array.from(
+        current.querySelectorAll<HTMLElement>('.main-top .panel-nav a.master-drive-link'),
+      ).find((node) => {
+        const rect = node.getBoundingClientRect()
+        return rect.width > 0 && rect.height > 0
+      })
+      if (masterLink) {
+        this.logger.info('旧版搜索页顶栏锚点定位完成', 'master-drive-link')
+        return masterLink
+      }
+    }
+
+    /** 1.2 入口延迟注入时，先挂到可见顶栏容器，避免落入左侧纵向菜单。 */
+    const panelNav = this.getAccessibleDocuments()
+      .map(current => current.querySelector<HTMLElement>('.main-top .panel-nav'))
+      .find((node) => {
+        if (!node)
+          return false
+        const rect = node.getBoundingClientRect()
+        return rect.width > 0 && rect.height > 0
+      }) ?? null
+
+    this.logger.info('旧版搜索页顶栏锚点定位完成', panelNav ? 'panel-nav' : 'none')
+    return panelNav
+  }
+
   /** 查找当前可见的 115“新建”按钮。 */
   private findToolbarAnchor(): HTMLElement | null {
-    const candidates = Array.from(
-      document.querySelectorAll<HTMLElement>('button, [role="button"]'),
-    )
-    return candidates.find((node) => {
+    /*
+     * ================================================================================
+     * 步骤1：定位新版工具栏按钮
+     * ================================================================================
+     * 目标：只把 Fusion 挂到横向工具栏，不误挂到纵向侧栏里的“新建”。
+     * 数据源：当前页面及同源 iframe 内的可见按钮节点。
+     * 操作：
+     * 1) 匹配“新建”及其带前缀、下拉箭头变体
+     * 2) 排除高而窄的纵向导航容器
+     */
+    this.logger.info('开始定位新版页面新建按钮')
+
+    const candidates = this.getAccessibleDocuments().flatMap(current => Array.from(
+      current.querySelectorAll<HTMLElement>(
+        'button, a, [role="button"], [class*="cursor-pointer"]',
+      ),
+    ))
+    const anchor = candidates.find((node) => {
       const label = node.textContent?.replace(/\s+/g, '').trim()
       const rect = node.getBoundingClientRect()
-      return label === '新建' && rect.width > 0 && rect.height > 0
+      return Boolean(
+        label
+        && /^\+?新建[▼▾⌄]?$/.test(label)
+        && rect.width > 0
+        && rect.height > 0
+        && !this.isVerticalNavigation(node),
+      )
     }) ?? null
+
+    this.logger.info('新版页面新建按钮定位完成', Boolean(anchor))
+    return anchor
+  }
+
+  /** 判断节点是否位于高而窄的纵向导航中。 */
+  private isVerticalNavigation(node: HTMLElement): boolean {
+    /**
+     * ================================================================================
+     * 步骤1：过滤纵向导航候选
+     * ================================================================================
+     * 目标：避免把顶栏工具组插入左侧菜单后被 flex 容器撑满。
+     * 数据源：候选节点及其最多六层祖先的布局尺寸和 class。
+     * 操作：
+     * 1) 识别旧版侧栏命名和纵向 flex 容器
+     * 2) 只要命中一项就拒绝当前候选
+     */
+    let current: HTMLElement | null = node
+    for (let depth = 0; current && depth < 6; depth += 1) {
+      const rect = current.getBoundingClientRect()
+      const style = current.ownerDocument.defaultView?.getComputedStyle(current)
+      const className = typeof current.className === 'string' ? current.className : ''
+      const namedSide = /(?:^|[-_])(?:side|sidebar)(?:[-_]|$)/i.test(className)
+      const verticalFlex = style?.display.includes('flex')
+        && style.flexDirection === 'column'
+        && rect.height >= 160
+        && rect.height > rect.width * 2
+      if (namedSide || verticalFlex)
+        return true
+      current = current.parentElement
+    }
+
+    return false
   }
 
   /** 找到“新建”按钮所属的顶层工具项，避免插入下拉按钮内部。 */
@@ -452,23 +652,72 @@ class OfficialPage {
     if (!this.host || !document.body)
       return
 
-    const anchor = this.findToolbarAnchor()
-    const mount = anchor ? this.findToolbarMount(anchor) : null
+    /*
+     * ================================================================================
+     * 步骤1：选择当前页面工具栏挂载点
+     * ================================================================================
+     * 目标：旧版保留原版入口，新版才挂载 Fusion 工具组。
+     * 数据源：旧版预览开关、旧版顶栏入口和新版“新建”按钮。
+     * 操作：
+     * 1) 发现旧版入口时卸载 Fusion 宿主
+     * 2) 其他页面再解析新版工具项
+     */
+    this.logger.info('开始选择当前页面工具栏挂载点')
+
+    /** 1.1 旧版 iframe 是用户可见主界面，由旧版入口和原版预览控件负责。 */
+    const legacyPreview = this.findLegacyPreviewAnchor()
+    const legacyToolbar = legacyPreview ? null : this.findLegacyToolbarAnchor()
+    if (legacyPreview || legacyToolbar) {
+      if (this.toolbarRetryId !== null)
+        window.clearTimeout(this.toolbarRetryId)
+      this.toolbarRetryId = null
+      this.toolbarRetryAttempts = 0
+      this.toolbarMount = null
+      this.host.remove()
+      this.host.setAttribute('data-placement', 'legacy-hidden')
+      this.logger.info(
+        '检测到旧版页面，保留原版入口并卸载 Fusion 工具组',
+        legacyPreview ? 'legacy-preview' : 'legacy-toolbar',
+      )
+      return
+    }
+
+    /** 1.2 没有旧版标记时，才解析新版横向工具栏。 */
+    const toolbarAnchor = this.findToolbarAnchor()
+    const mount = (toolbarAnchor ? this.findToolbarMount(toolbarAnchor) : null)
+      ?? (this.toolbarMount?.isConnected ? this.toolbarMount : null)
     if (mount?.parentElement) {
       if (this.toolbarRetryId !== null)
         window.clearTimeout(this.toolbarRetryId)
       this.toolbarRetryId = null
       this.toolbarRetryAttempts = 0
       this.host.setAttribute('data-placement', 'toolbar')
+      this.toolbarMount = mount
+      if (this.host.ownerDocument !== mount.ownerDocument)
+        mount.ownerDocument.adoptNode(this.host)
       if (
         this.host.parentElement !== mount.parentElement
         || this.host.previousElementSibling !== mount
       ) {
         mount.insertAdjacentElement('afterend', this.host)
       }
+      this.logger.info(
+        '当前页面工具栏挂载点选择完成',
+        'toolbar',
+      )
       return
     }
 
+    /** 1.3 选择态替换原生按钮时保留现有工具栏宿主，等待原生层级覆盖。 */
+    if (
+      this.host.getAttribute('data-placement') === 'toolbar'
+      && this.host.parentElement?.isConnected
+    ) {
+      this.logger.info('当前页面处于选择态，保留现有工具栏挂载')
+      return
+    }
+
+    this.logger.info('当前页面工具栏挂载点选择完成，使用浮动回退')
     this.host.setAttribute('data-placement', 'floating')
     if (this.host.parentElement !== document.body)
       document.body.append(this.host)
