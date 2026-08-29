@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: wontfix
 
 # 文件列表缓存与增量更新重构（Drive List Cache & Incremental Update）
 
@@ -258,3 +258,5 @@ reorder(pages: Map<number, Page>, size: number, op: ReorderOp): Map<number, Page
 - `pnpm dev` 跑起后手动操作验证；涉及 115 真实账号的导航/操作联调点由用户手动执行或授权 Playwright 连浏览器（同 tag-management spec 约定）。
 
 ## Comments
+
+- 原 PageCache/SWR/本地增量方案曾由 `3938ab4` 落地，后续改为 TanStack Query，再由 `f21cc01`、`9a4cfb7`、`f84bb01` 移除缓存与滚动记忆。当前契约是查询变化后重新请求，不再按此旧规格开发。

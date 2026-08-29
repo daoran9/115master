@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 
 # 应用无关的 UI 基础包
 
@@ -339,3 +339,5 @@ UI 包建立独立 Storybook，将基础 Story 作为唯一行为测试接缝，
 - 更新后的领域文档、ADR 与 skills 与代码事实一致，且没有复制 Design Token 具体值。
 
 ## Comments
+
+- 已由 `c9b6135`、`534e837`、`77d1c2c`、`b8b86a9`、`8e4006b` 完成 UI 包、核心组件迁移、Dialog 服务、样式所有权和双 Storybook 门禁；子 issue 01-10 均已标记 `resolved`。

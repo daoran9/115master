@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 
 # 标签管理页面（Tag Management）
 
@@ -199,3 +199,4 @@ Status: ready-for-agent
 - `addLabels` / `editLabel` / `deleteLabel` 均以 `state + code + message` 表示成功或失败。
 - 标签名实际最大长度为 50；51 字符返回 `code=21002`。
 - 联调测试标签已全部删除，并重新拉取列表确认无残留。
+- 已由 `6f68d3d` 完成标签管理页，并由 `f9ab350` 按真实 115 响应修正接口假设。

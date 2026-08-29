@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 
 # 移动端文件列表打开与多选交互（Mobile File Open & Selection）
 
@@ -228,3 +228,5 @@ Status: ready-for-agent
 - 联调触点：`pnpm dev` 跑起后，用户手动真机 / 模拟器操作 vs agent 用 Playwright 连用户浏览器操作（移动端手势 Playwright 模拟受限，长按 / 触摸可能需真机）——在第一个联调点前确定（同 file-tagging spec 约定）。
 
 ## Comments
+
+- 已由 `09d5daf` 完成文件列表单击打开、长按多选和选择模式，并由后续选择、拖拽与 ActionBar 提交持续回归。

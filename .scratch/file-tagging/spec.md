@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 
 # 文件列表打标签（File Tagging）
 
@@ -208,3 +208,5 @@ resolveFileTagChanges(
 - 联调触点：`pnpm dev` 跑起后，用户手动操作 vs agent 用 Playwright 连用户浏览器操作（需授权）——在第一个联调点前确定（同 tag-management spec 约定）。
 
 ## Comments
+
+- 已由 `441f1ee` 完成文件列表标签操作；当前实现包含 `useTagAction`、标签选择器、批量写回和对应测试。
