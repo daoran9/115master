@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] UI Storybook 使用 preview factory，并完整注册 Docs、a11y 与 Vitest addon annotations，同时保留现有 Theme toolbar、Theme-scoped root、布局、背景和 a11y error policy
 - [ ] Button 文件整体采用 CSF Next，父 Story 继续拥有唯一的 render、args、fixture、Autodocs 与 Controls 定义

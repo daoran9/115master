@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — 固化 UI 显式测试基线与 Button 回归门.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Overlay Host 的 Theme-scoped target 父 Story 不再自动打开说明浮层，其目标归属和 Theme 契约由 `.test()` 显式执行
 - [ ] Tooltip 的 interaction、content／empty content、placements、edge／scroll 与 overlay targets 五个父 Story 均不再自动 hover、click、Tab、Escape 或滚动

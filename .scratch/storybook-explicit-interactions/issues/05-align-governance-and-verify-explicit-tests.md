@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 — 迁移非 Dialog 的 UI 基础 Story; 03 — 迁移 Dialog 原语与服务显式测试; 04 — 建立 Monkey 显式浏览器测试切片.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] 修订真实浏览器 Story 测试 ADR 或发布后继 ADR，记录父 Story 只呈现初始状态、交互契约附着到 `.test()` 和文件级增量迁移政策
 - [ ] ADR 明确区分 UI CLI／CI 的 light、dark、reduced-motion、mobile 四项目矩阵、Manager 的 light-only compatibility workaround 与 Monkey 的单一默认 Theme project

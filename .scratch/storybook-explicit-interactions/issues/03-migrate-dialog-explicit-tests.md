@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — 固化 UI 显式测试基线与 Button 回归门.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Dialog 原语文件整体采用 CSF Next，controlled、label-only、unmounting、close policies、sizes／responsive presentation 与 reduced-motion 六个父 Story 不再自动打开、关闭、卸载或移动焦点
 - [ ] 六个 Dialog 原语场景原有的 button、Escape、backdrop、焦点恢复、生命周期、尺寸、响应式和 reduced-motion 断言全部附着到对应父 Story 的 `.test()`

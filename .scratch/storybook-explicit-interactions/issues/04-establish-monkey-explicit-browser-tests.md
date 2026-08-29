@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — 固化 UI 显式测试基线与 Button 回归门.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Monkey Storybook 使用 preview factory，并在保留现有 Theme toolbar、应用背景、Overlay Host、Dialog Host、应用 Teleport 集成与本地图标 registry 的前提下注册 Docs 和 Vitest annotations
 - [ ] Monkey Storybook 启用 Vitest addon，并建立一个使用应用默认 Theme 的真实 Chromium browser project
