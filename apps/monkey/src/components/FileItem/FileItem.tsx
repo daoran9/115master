@@ -205,6 +205,7 @@ const FileItem = defineComponent({
             group-data-[view-type=card]:min-w-0 group-data-[view-type=card]:flex-1
             group-data-[view-type=card]:flex-col group-data-[view-type=list]:flex
             group-data-[view-type=list]:min-w-0 group-data-[view-type=list]:flex-1
+            group-data-[view-type=list]:shrink-0 group-data-[view-type=list]:basis-full
             group-data-[view-type=list]:items-center group-data-[view-type=list]:gap-3
             group-data-[view-type=list]:py-1
             focus:outline-none focus-visible:outline-2
@@ -269,9 +270,10 @@ const FileItem = defineComponent({
             {showAvInfo.value && avNumber.value && !props.pathSelect && (
               <div
                 class="
-                  border-base-content/10 w-full border-t
+                  border-base-content/10 w-full shrink-0 basis-full border-t
                   group-data-[select-mode=true]:hidden
                 "
+                data-file-item-ext-info
               >
                 <ExtInfo
                   avNumber={avNumber.value}

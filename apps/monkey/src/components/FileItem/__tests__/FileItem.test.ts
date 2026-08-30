@@ -142,6 +142,10 @@ describe('fileItem', () => {
     const info = root.querySelector('[data-ext-info="ABP-123"]')
     expect(info).not.toBeNull()
     expect(info?.getAttribute('data-variant')).toBe('drive')
+
+    const region = root.querySelector<HTMLElement>('[data-file-item-ext-info]')!
+    expect(region.classList).toContain('shrink-0')
+    expect(region.classList).toContain('basis-full')
   })
 
   it('番号资料开关关闭时不挂载资料卡', async () => {
@@ -202,6 +206,8 @@ describe('fileItem', () => {
     const checkbox = root.querySelector<HTMLInputElement>('input[type="checkbox"]')!
     const link = root.querySelector('a')!
 
+    expect(link.classList).toContain('group-data-[view-type=list]:shrink-0')
+    expect(link.classList).toContain('group-data-[view-type=list]:basis-full')
     expect(label.classList).toContain('group-data-[view-type=list]:w-9')
     expect(label.classList).toContain('group-data-[view-type=list]:translate-x-[var(--main-content-gutter)]')
     expect(label.classList).not.toContain('group-data-[view-type=list]:-translate-x-9')

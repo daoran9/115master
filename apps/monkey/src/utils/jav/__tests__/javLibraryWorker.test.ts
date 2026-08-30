@@ -26,6 +26,7 @@ it('javLibrary 工作页等待共享槽空闲后再提交任务', async () => {
   vi.useFakeTimers()
 
   const store = new Map<string, unknown>([
+    ['115master-javlibrary-worker-ready', Date.now()],
     ['115master-javlibrary-worker-request', {
       id: 'other-page-task',
       avNumber: 'OTHER-001',
@@ -103,7 +104,9 @@ it('值变更监听漏发时通过轮询接收 JavLibrary 工作结果', async (
   testLogger.info('开始验证 JavLibrary 工作结果轮询兜底')
   vi.useFakeTimers()
 
-  const store = new Map<string, unknown>()
+  const store = new Map<string, unknown>([
+    ['115master-javlibrary-worker-ready', Date.now()],
+  ])
   vi.stubGlobal('window', globalThis)
   vi.stubGlobal('GM_getValue', (key: string, defaultValue?: unknown) =>
     store.has(key) ? store.get(key) : defaultValue)
@@ -176,6 +179,40 @@ it('后台标签心跳降频时复用现有 JavLibrary 工作页', async () => {
   testLogger.info('JavLibrary 后台 worker 心跳宽限验证完成')
 })
 
+it('没有现成工作页时不主动打开 JavLibrary 标签', async () => {
+  /*
+   * ================================================================================
+   * 步骤1：验证外站标签静默策略
+   * ================================================================================
+   * 目标：文件列表查询资料时不打断当前 115 页面。
+   * 数据源：没有 JavLibrary 工作页心跳的 GM 存储。
+   * 操作：
+   * 1) 提交一次 JavLibrary 工作请求
+   * 2) 核对请求立即回退且没有打开外站或占用共享槽
+   */
+  testLogger.info('开始验证 JavLibrary 外站标签静默策略')
+  const store = new Map<string, unknown>()
+  const openInTab = vi.fn()
+  vi.stubGlobal('window', globalThis)
+  vi.stubGlobal('GM_getValue', (key: string, defaultValue?: unknown) =>
+    store.has(key) ? store.get(key) : defaultValue)
+  vi.stubGlobal('GM_setValue', (key: string, value: unknown) => store.set(key, value))
+  vi.stubGlobal('GM_deleteValue', (key: string) => store.delete(key))
+  vi.stubGlobal('GM_openInTab', openInTab)
+  vi.stubGlobal('GM_addValueChangeListener', vi.fn(() => 1))
+
+  const { createJavLibraryWorkerRequest } = await import('../javLibraryWorker')
+  const handle = createJavLibraryWorkerRequest(
+    'NO-TAB-001',
+    'https://www.javlibrary.com/cn/vl_searchbyid.php?keyword=NO-TAB-001',
+  )
+
+  await expect(handle.promise).resolves.toBeUndefined()
+  expect(openInTab).not.toHaveBeenCalled()
+  expect(store.has('115master-javlibrary-worker-request')).toBe(false)
+  testLogger.info('JavLibrary 外站标签静默策略验证完成')
+})
+
 it('javLibrary 工作页自动回收失去所属页面的遗留任务', async () => {
   /*
    * ================================================================================
@@ -192,6 +229,7 @@ it('javLibrary 工作页自动回收失去所属页面的遗留任务', async ()
   vi.setSystemTime(120_000)
 
   const store = new Map<string, unknown>([
+    ['115master-javlibrary-worker-ready', Date.now()],
     ['115master-javlibrary-worker-request', {
       id: '1000-old-page-task',
       createdAt: 1000,
@@ -235,7 +273,9 @@ it('取消 JavLibrary 工作任务时释放本页占用的共享槽', async () =
   testLogger.info('开始验证 JavLibrary 工作任务取消')
   vi.useFakeTimers()
 
-  const store = new Map<string, unknown>()
+  const store = new Map<string, unknown>([
+    ['115master-javlibrary-worker-ready', Date.now()],
+  ])
   vi.stubGlobal('window', globalThis)
   vi.stubGlobal('GM_getValue', (key: string, defaultValue?: unknown) =>
     store.has(key) ? store.get(key) : defaultValue)

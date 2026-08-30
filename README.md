@@ -10,7 +10,7 @@
 
 `115Master Fusion` 基于上游未发布的 v2 分支，融合旧版增强功能。脚本使用独立名称、namespace 和更新源，不会被官方 `115Master` 自动更新覆盖。
 
-当前版本：`2.0.0-beta.100`。
+当前版本：`2.0.0-beta.101`。
 
 ## 使用前
 
@@ -22,7 +22,7 @@
 - Tampermonkey 5.3.3+ 或 ScriptCat
 - 浏览器扩展开发者模式已开启
 
-JavLibrary 或 FD2PPV 启用 Cloudflare 挑战时，须先在安装脚本的同一浏览器打开对应站点并完成人工验证。脚本会复用该站点的 Cookie 分区；它无法代替用户完成 Cloudflare 验证。若当前网络无法直连来源站点，须给该域名配置单域代理或自有 HTTPS 中转；脚本不能在无可用网络路由时绕过站点限制。
+JavLibrary 或 FD2PPV 启用 Cloudflare 挑战时，须先在安装脚本的同一浏览器打开对应站点并完成人工验证。需要 JavLibrary 第一方页面通道时须保留该页面；Fusion 不会主动打开外站标签。脚本会复用该站点的 Cookie 分区；它无法代替用户完成 Cloudflare 验证。若当前网络无法直连来源站点，须给该域名配置单域代理或自有 HTTPS 中转；脚本不能在无可用网络路由时绕过站点限制。
 
 安装文件：[`115master-fusion.user.js`](https://github.com/daoran9/115master/releases/latest/download/115master-fusion.user.js)
 

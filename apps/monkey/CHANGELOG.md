@@ -1,5 +1,12 @@
 # @115master/monkey
 
+## 2.0.0-beta.101
+
+### Patch Changes
+
+- Fusion 独立管理器的列表排列中，番号详情固定独占文件主体下方整行，不再挤窄文件名或覆盖后续虚拟列表项。
+- 番号查询不再主动打开 JavLibrary 外站标签；已有 JavLibrary 工作页仍可复用，其他情况继续走 GM 请求、缓存和后备资料源。
+
 ## 2.0.0-beta.100
 
 ### Minor Changes

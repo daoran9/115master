@@ -39,7 +39,6 @@ interface GMWorkerGlobal {
   ) => unknown
   GM_deleteValue?: (key: string) => void
   GM_getValue?: <T>(key: string, defaultValue?: T) => T
-  GM_openInTab?: (url: string, options?: Record<string, unknown>) => unknown
   GM_setValue?: (key: string, value: unknown) => void
 }
 
@@ -59,16 +58,21 @@ export interface JavLibraryWorkerHandle {
 
 const localQueue: WorkerTask[] = []
 let activeTask: WorkerTask | undefined
-let workerOpened = false
 let listenerRegistered = false
 
 /** 判断当前页面是否具备 Tampermonkey 跨标签存储能力。 */
 function hasWorkerStorageApi() {
   return typeof gm.GM_getValue === 'function'
     && typeof gm.GM_setValue === 'function'
-    && typeof gm.GM_openInTab === 'function'
     && typeof gm.GM_addValueChangeListener === 'function'
     && typeof gm.GM_deleteValue === 'function'
+}
+
+/** 只复用用户已经打开的 JavLibrary 页面，不由文件列表主动打开外站标签。 */
+function hasReadyWorker() {
+  if (!hasWorkerStorageApi())
+    return false
+  return Date.now() - Number(gm.GM_getValue!(READY_KEY, 0)) < READY_TTL_MS
 }
 
 /** 启动一次跨标签结果监听。 */
@@ -122,32 +126,6 @@ function clearWorkerTaskTimers(task: WorkerTask) {
   task.resultPollId = undefined
 }
 
-/** 确保 JavLibrary 工作标签页存在，不切换当前用户标签。 */
-function ensureWorkerTab() {
-  if (!hasWorkerStorageApi())
-    return
-  const readyAt = Number(gm.GM_getValue!(READY_KEY, 0))
-  if (Date.now() - readyAt < READY_TTL_MS || workerOpened)
-    return
-
-  workerOpened = true
-  try {
-    const handle = gm.GM_openInTab!(JAVLIBRARY_WORKER_URL, {
-      active: false,
-      insert: true,
-      setParent: true,
-    })
-    if (handle && typeof handle === 'object' && 'onclose' in handle) {
-      ;(handle as { onclose: (() => void) | null }).onclose = () => {
-        workerOpened = false
-      }
-    }
-  }
-  catch {
-    workerOpened = false
-  }
-}
-
 /** 当前标签确认共享请求槽后再启动超时计时。 */
 function confirmWorkerTask(task: WorkerTask) {
   if (activeTask?.request.id !== task.request.id)
@@ -164,7 +142,6 @@ function confirmWorkerTask(task: WorkerTask) {
       return
     clearWorkerTaskTimers(task)
     clearJavLibraryWorkerRequest(task.request.id)
-    workerOpened = false
     activeTask = undefined
     task.resolve(undefined)
     pumpWorkerQueue()
@@ -245,7 +222,6 @@ function dispatchWorkerTask(task: WorkerTask) {
     return
   }
   ensureResultListener()
-  ensureWorkerTab()
   claimWorkerSlot(task)
 }
 
@@ -275,7 +251,7 @@ export function createJavLibraryWorkerRequest(
   avNumber: string,
   searchUrl: string,
 ): JavLibraryWorkerHandle {
-  if (!hasWorkerStorageApi()) {
+  if (!hasReadyWorker()) {
     return {
       promise: Promise.resolve(undefined),
       cancel: () => {},
